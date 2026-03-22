@@ -1,44 +1,51 @@
 # Energy Forecast
-
 MLOps project for electricity consumption prediction.
 
 ## Инфраструктура проекта
+Python: 3.14 (зависимости зафиксированы в requirements.txt).
 
-* **Python: 3.14** (зависимости зафиксированы в `requirements.txt`).
-* **MLflow:** Настроен Docker Compose для автоматического трекинга метрик и моделей.
-* **DVC:** Внедрена система контроля версий данных (Data Version Control).
-* **IDE:** Настроены локальные конфиги для VS Code (`.vscode`) для корректного запуска через кнопку Run.
+MLflow: Настроен Docker Compose для автоматического трекинга метрик и моделей.
+
+DVC: Внедрена система контроля версий данных (Data Version Control).
+
+
 
 ## Быстрый старт
+## 1. Настройка окружения
 
-### 1. Настройка окружения
-
-```bash
+``` python
 # Клонирование репозитория
-git clone [https://github.com/maxim283b/energy_forecast.git](https://github.com/maxim283b/energy_forecast.git)
+git clone https://github.com/maxim283b/energy_forecast.git
 cd energy_forecast
+```
 
-# Создание виртуального окружения
+``` bash
+Создание виртуального окружения
 python -m venv venv
 source venv/bin/activate  # Для Mac/Linux
-# venv\Scripts\activate   # Для Windows
+venv\Scripts\activate   # Для Windows
+```
 
-# Установка зависимостей
+``` bash
+Установка зависимостей
 pip install -r requirements.txt
-2. Запуск сервисов
+```
+## 2. Запуск сервисов
 
-Bash
+``` bash
 # Запуск MLflow сервера (требуется Docker)
 docker-compose up -d
-Интерфейс MLflow доступен по адресу: http://localhost:5000
+# Интерфейс MLflow доступен по адресу: http://localhost:5000
+```
 
-3. Проверка системы
+## 3. Проверка системы
 
 Запустите файл test_infra.py через кнопку Run в VS Code или через терминал:
 
-Bash
+``` bash
 python test_infra.py
-Сообщение Connection successful to MLflow! подтверждает готовность среды к работе.
+# Сообщение Connection successful to MLflow! подтверждает готовность среды к работе.
+```
 
 Структура проекта
 Plaintext
@@ -54,10 +61,11 @@ Plaintext
 │   └── visualization  <- Скрипты визуализации результатов.
 ├── docker-compose.yml <- Конфигурация MLflow сервера.
 └── README.md          <- Инструкция по использованию проекта.
-Использование MLflow
+
+## Использование MLflow
 Для регистрации параметров и метрик в коде используйте следующий блок:
 
-Python
+``` python
 import mlflow
 
 mlflow.set_tracking_uri("http://localhost:5000")
@@ -65,4 +73,5 @@ mlflow.set_experiment("energy_prediction")
 
 with mlflow.start_run():
     mlflow.log_param("model_type", "random_forest")
+```
     mlflow.log_metric("rmse", 0.12)
