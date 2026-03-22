@@ -20,7 +20,7 @@ cd energy_forecast
 ```
 
 ``` bash
-Создание виртуального окружения
+# Создание виртуального окружения
 python -m venv venv
 source venv/bin/activate  # Для Mac/Linux
 venv\Scripts\activate   # Для Windows
@@ -46,7 +46,7 @@ docker-compose up -d
 python test_infra.py
 # Сообщение Connection successful to MLflow! подтверждает готовность среды к работе.
 ```
-
+```
 Структура проекта
 Plaintext
 ├── data
@@ -61,6 +61,7 @@ Plaintext
 │   └── visualization  <- Скрипты визуализации результатов.
 ├── docker-compose.yml <- Конфигурация MLflow сервера.
 └── README.md          <- Инструкция по использованию проекта.
+```
 
 ## Использование MLflow
 Для регистрации параметров и метрик в коде используйте следующий блок:
