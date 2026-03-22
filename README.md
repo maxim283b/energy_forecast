@@ -1,57 +1,50 @@
-energy_forecast
-==============================
+Energy Forecast
+MLOps project for electricity consumption prediction.
 
-MLOps project for electricity consumption prediction
+Инфраструктура проекта
+Python: 3.14
 
-Project Organization
-------------
+MLflow: Настроен Docker Compose для автоматического трекинга метрик и моделей.
 
-    ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
+DVC: Внедрена система контроля версий данных (Data Version Control).
 
+Быстрый старт
+1. Настройка окружения
 
---------
+# Bash
+git clone https://github.com/maxim283b/energy_forecast.git
+cd energy_forecast
 
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+# Создание виртуального окружения
+python -m venv venv
+source venv/bin/activate  # Для Mac/Linux
+# venv\Scripts\activate   # Для Windows
+
+# Установка зависимостей
+pip install -r requirements.txt
+
+2. Запуск сервисов
+
+Bash
+# Запуск MLflow сервера (требуется Docker)
+docker-compose up -d
+Интерфейс MLflow доступен по адресу: http://localhost:5000
+
+3. Проверка системы
+
+Запустите файл test_infra.py через кнопку Run в VS Code. Сообщение Connection successful to MLflow! подтверждает готовность среды.
+
+Структура папок
+Plaintext
+├── data
+│   ├── processed      <- Финальные наборы данных для моделирования.
+│   └── raw            <- Исходные неизменяемые данные (immuttable).
+├── models             <- Обученные модели и их описания.
+├── notebooks          <- Jupyter notebooks для анализа (EDA).
+├── src                <- Исходный код проекта:
+│   ├── data           <- Скрипты загрузки/генерации данных.
+│   ├── features       <- Скрипты генерации признаков.
+│   ├── models         <- Скрипты обучения и предсказания.
+│   └── visualization  <- Скрипты визуализации результатов.
+├── docker-compose.yml <- Конфигурация MLflow сервера.
+└── README.md          <- Инструкция по использованию проекта.
