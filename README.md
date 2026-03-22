@@ -46,9 +46,9 @@ docker-compose up -d
 python test_infra.py
 # Сообщение Connection successful to MLflow! подтверждает готовность среды к работе.
 ```
-```
 Структура проекта
-Plaintext
+
+``` text
 ├── data
 │   ├── processed      <- Финальные наборы данных для моделирования.
 │   └── raw            <- Исходные неизменяемые данные (immutable).
