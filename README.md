@@ -21,7 +21,7 @@ source venv/bin/activate  # Для Mac/Linux
 # venv\Scripts\activate   # Для Windows
 
 # Установка зависимостей
-pip install -r requirements.txt
+``` pip install -r requirements.txt
 
 2. Запуск сервисов
 
