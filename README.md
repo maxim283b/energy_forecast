@@ -74,5 +74,5 @@ mlflow.set_experiment("energy_prediction")
 
 with mlflow.start_run():
     mlflow.log_param("model_type", "random_forest")
-```
     mlflow.log_metric("rmse", 0.12)
+```
