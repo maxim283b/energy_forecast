@@ -175,7 +175,7 @@ SQLAlchemy==2.0.48
 sqlparse==0.5.5
 sqltrie==0.11.2
 # Editable Git install with no remote (src==0.1.0)
--e /Users/maksi/Documents/projects/MLOPS/energy_forecast
+-e 
 starlette==0.52.1
 tabulate==0.10.0
 text-unidecode==1.3
