@@ -25,19 +25,18 @@ source venv/bin/activate  # Для Mac/Linux
 
 # Установка зависимостей
 pip install -r requirements.txt
+2. Запуск сервисов
 
-### 2. Запуск сервисов
-
-```bash
+Bash
 # Запуск MLflow сервера (требуется Docker)
 docker-compose up -d
 Интерфейс MLflow доступен по адресу: http://localhost:5000
 
-### 3. Проверка системы
+3. Проверка системы
 
-Для проверки корректности настройки запустите файл test_infra.py через кнопку Run в VS Code или через терминал:
+Запустите файл test_infra.py через кнопку Run в VS Code или через терминал:
 
-```bash
+Bash
 python test_infra.py
 Сообщение Connection successful to MLflow! подтверждает готовность среды к работе.
 
@@ -56,10 +55,9 @@ Plaintext
 ├── docker-compose.yml <- Конфигурация MLflow сервера.
 └── README.md          <- Инструкция по использованию проекта.
 Использование MLflow
+Для регистрации параметров и метрик в коде используйте следующий блок:
 
-## Для регистрации параметров и метрик в коде используйте следующий блок:
-
-```python
+Python
 import mlflow
 
 mlflow.set_tracking_uri("http://localhost:5000")
