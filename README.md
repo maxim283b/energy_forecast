@@ -75,3 +75,30 @@ with mlflow.start_run():
     mlflow.log_param("model_type", "random_forest")
     mlflow.log_metric("rmse", 0.12)
 ```
+
+## Начало работы с моделями
+
+```
+Необходимо настроить добавить API ключи в файл .env
+```
+
+
+### Загрузка файла
+``` 
+python src/data_ingestion/entsoe_parser.py
+```
+### Запуск обучения
+```
+python src/training/train_optimized.py
+```
+### Просмотр результатов MLflow
+```
+mlflow ui --port 5001
+```
+### Все эксперименты логируются в MLflow. Для просмотра:
+```
+mlflow ui --port 5001
+```
+Затем откройте http://localhost:5001
+
+
