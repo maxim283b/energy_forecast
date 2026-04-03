@@ -66,7 +66,7 @@ def plot_predictions(y_test, y_pred, save_path):
 
 def setup_mlflow():
     # Настройка на удаленный сервер в Docker
-    mlflow.set_tracking_uri("http://localhost:5000")
+    mlflow.set_tracking_uri("http://localhost:5050") 
     
     experiment_name = "Energy Price Prediction"
     experiment = mlflow.get_experiment_by_name(experiment_name)
@@ -78,15 +78,21 @@ def setup_mlflow():
 
     return experiment_id
 
-def main():
-    # Путь к актуальному файлу Open-Meteo
-    data_path = ROOT_DIR / 'data/raw/weather_data.csv'
 
+def main():
+    data_path = ROOT_DIR / 'data/raw/weather_data.csv'
+    
+    print(f"DEBUG: Looking for data at {data_path}") # Добавь это
+    
     if not data_path.exists():
-        print(f"Data file not found: {data_path}")
+        print(f"❌ Data file not found at: {data_path}")
+        print(f"Current working directory: {Path.cwd()}")
         return
 
+    print("✅ File found. Loading data...")
     df = load_and_prepare_data(data_path)
+    
+    print(f"✅ Data loaded. Rows: {len(df)}")
     X, y, feature_columns = create_features(df)
 
     split_idx = int(len(df) * 0.8)
