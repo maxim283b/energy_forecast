@@ -1,0 +1,5 @@
+outs:
+- md5: e1e65e3648373a190b38ef579af3d478
+  size: 688725
+  hash: md5
+  path: merged_energy_weather_2024.csv
