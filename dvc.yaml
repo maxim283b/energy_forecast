@@ -1,0 +1,8 @@
+stages:
+  ingest:
+    cmd: python src/data_ingestion/entsoe_parser.py
+    deps:
+    - src/data_ingestion/entsoe_parser.py
+    outs:
+    - data/raw/merged_energy_weather_2024.csv
+

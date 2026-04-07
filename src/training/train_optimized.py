@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import mlflow
+import mlflow.sklearn
 from pathlib import Path
 import matplotlib.pyplot as plt
 
@@ -34,7 +35,8 @@ def load_and_prepare_data(file_path):
     df['day_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
     df['day_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
 
-    df = df.fillna(method='bfill').fillna(method='ffill')
+    # Используем современные методы для заполнения пропусков (вместо устаревшего method='bfill')
+    df = df.bfill().ffill()
 
     return df
 
@@ -89,8 +91,9 @@ def evaluate_model(model, X_test, y_test):
 def plot_predictions(y_test, y_pred, save_path):
     """Построить график предсказаний"""
     plt.figure(figsize=(12, 6))
-    plt.plot(y_test.values[:336], label='Actual', alpha=0.7)
-    plt.plot(y_pred[:336], label='Predicted', alpha=0.7)
+    # Берем две недели (336 часов) для детального анализа
+    plt.plot(y_test.values[:336], label='Actual', alpha=0.7, color='blue')
+    plt.plot(y_pred[:336], label='Predicted', alpha=0.7, color='red', linestyle='--')
     plt.xlabel('Hour')
     plt.ylabel('Price (EUR/MWh)')
     plt.title('Optimized Energy Price Prediction')
@@ -102,9 +105,8 @@ def plot_predictions(y_test, y_pred, save_path):
 
 def setup_mlflow():
     """Настроить MLflow"""
-    mlflow_dir = ROOT_DIR / 'mlflow'
-    mlflow_dir.mkdir(exist_ok=True)
-    mlflow.set_tracking_uri(f"file://{mlflow_dir}")
+    # Настройка на удаленный сервер в Docker
+    mlflow.set_tracking_uri("http://localhost:5050")
 
     experiment_name = "Energy Price Prediction Optimized"
     experiment = mlflow.get_experiment_by_name(experiment_name)
@@ -133,8 +135,8 @@ def main():
 
     X, y, feature_columns = create_features(df)
     print(f"Total features: {len(feature_columns)}")
-    print(f"Features: {feature_columns}")
 
+    # Хронологический сплит
     split_idx = int(len(df) * 0.8)
     X_train, X_test = X[:split_idx], X[split_idx:]
     y_train, y_test = y[:split_idx], y[split_idx:]
@@ -159,8 +161,8 @@ def main():
         'importance': model.feature_importances_
     }).sort_values('importance', ascending=False)
 
-    print("\nFeature Importance:")
-    for _, row in feature_importance.iterrows():
+    print("\nTop Feature Importance:")
+    for _, row in feature_importance.head(10).iterrows():
         print(f"  {row['feature']}: {row['importance']:.4f}")
 
     plot_path = ROOT_DIR / 'data/plots/optimized_prediction.png'
@@ -171,18 +173,23 @@ def main():
     experiment_id = setup_mlflow()
 
     with mlflow.start_run(experiment_id=experiment_id):
-        mlflow.log_param("n_estimators", 300)
+        # Логируем параметры
+        mlflow.log_param("n_estimators", 500)
         mlflow.log_param("max_depth", 12)
         mlflow.log_param("min_samples_split", 5)
         mlflow.log_param("min_samples_leaf", 2)
+        mlflow.log_param("feature_engineering", "cyclic + rolling + weather + lags")
 
+        # Логируем метрики
         mlflow.log_metric("mae", mae)
         mlflow.log_metric("rmse", rmse)
         mlflow.log_metric("r2_score", r2)
 
+        # Логируем важность признаков
         for _, row in feature_importance.iterrows():
             mlflow.log_metric(f"importance_{row['feature']}", row['importance'])
 
+        # Сохраняем модель и артефакты
         mlflow.sklearn.log_model(model, "optimized_model")
         mlflow.log_artifact(plot_path)
 

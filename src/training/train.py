@@ -10,17 +10,11 @@ import matplotlib.pyplot as plt
 ROOT_DIR = Path(__file__).parent.parent.parent
 
 def load_and_prepare_data(file_path):
-    """Загрузка и адаптация данных Open-Meteo"""
     df = pd.read_csv(file_path)
-
-    # Адаптация колонок под логику модели
-    if 'temperature' in df.columns:
-        df = df.rename(columns={'temperature': 'price'})
     
-    # Конвертация времени (Open-Meteo формат)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df = df.dropna()
+    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
     
-    # Генерация признаков
     df['hour'] = df['timestamp'].dt.hour
     df['day_of_week'] = df['timestamp'].dt.dayofweek
     df['day_of_month'] = df['timestamp'].dt.day
@@ -30,7 +24,11 @@ def load_and_prepare_data(file_path):
     return df
 
 def create_features(df):
-    feature_columns = ['hour', 'day_of_week', 'day_of_month', 'month', 'weekend']
+    feature_columns = [
+        'hour', 'day_of_week', 'day_of_month', 'month', 'weekend',
+        'temperature_2m', 'relative_humidity_2m', 'precipitation', 
+        'cloud_cover', 'wind_speed_10m', 'pressure_msl'
+    ]
     X = df[feature_columns]
     y = df['price']
     return X, y, feature_columns
@@ -57,17 +55,15 @@ def plot_predictions(y_test, y_pred, save_path):
     plt.plot(y_test.values[:100], label='Actual', alpha=0.7)
     plt.plot(y_pred[:100], label='Predicted', alpha=0.7)
     plt.xlabel('Time Step')
-    plt.ylabel('Value')
-    plt.title('Weather/Energy Prediction')
+    plt.ylabel('Price')
+    plt.title('Energy Price Prediction')
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.savefig(save_path)
     plt.close()
 
 def setup_mlflow():
-    # Настройка на удаленный сервер в Docker
-    mlflow.set_tracking_uri("http://localhost:5050") 
-    
+    mlflow.set_tracking_uri("http://localhost:5050")
     experiment_name = "Energy Price Prediction"
     experiment = mlflow.get_experiment_by_name(experiment_name)
 
@@ -78,21 +74,14 @@ def setup_mlflow():
 
     return experiment_id
 
-
 def main():
-    data_path = ROOT_DIR / 'data/raw/weather_data.csv'
-    
-    print(f"DEBUG: Looking for data at {data_path}") # Добавь это
-    
+    data_path = ROOT_DIR / 'data/raw/merged_energy_weather_2024.csv'
+
     if not data_path.exists():
-        print(f"❌ Data file not found at: {data_path}")
-        print(f"Current working directory: {Path.cwd()}")
+        print(f"Data file not found: {data_path}")
         return
 
-    print("✅ File found. Loading data...")
     df = load_and_prepare_data(data_path)
-    
-    print(f"✅ Data loaded. Rows: {len(df)}")
     X, y, feature_columns = create_features(df)
 
     split_idx = int(len(df) * 0.8)
@@ -102,7 +91,6 @@ def main():
     model = train_model(X_train, y_train)
     mae, rmse, r2, y_pred = evaluate_model(model, X_test, y_test)
 
-    # Подготовка путей для артефактов
     plot_path = ROOT_DIR / 'data/plots/prediction_comparison.png'
     plot_path.parent.mkdir(parents=True, exist_ok=True)
     plot_predictions(y_test, y_pred, plot_path)
@@ -117,7 +105,6 @@ def main():
         mlflow.log_metric("rmse", rmse)
         mlflow.log_metric("r2_score", r2)
 
-        # Логирование важности признаков
         for name, imp in zip(feature_columns, model.feature_importances_):
             mlflow.log_metric(f"importance_{name}", imp)
 

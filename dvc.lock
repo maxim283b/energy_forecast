@@ -1,0 +1,14 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python src/data_ingestion/entsoe_parser.py
+    deps:
+    - path: src/data_ingestion/entsoe_parser.py
+      hash: md5
+      md5: 93059d6292f855cf51dd28d49438a2bc
+      size: 7301
+    outs:
+    - path: data/raw/merged_energy_weather_2024.csv
+      hash: md5
+      md5: e1e65e3648373a190b38ef579af3d478
+      size: 688725
