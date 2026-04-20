@@ -1,77 +1,85 @@
 import pandas as pd
 import numpy as np
-import mlflow.sklearn
+import mlflow.xgboost
+import holidays
 from pathlib import Path
 
 # Конфигурация
 ROOT_DIR = Path(__file__).parent.parent.parent
-MLFLOW_URI = "http://localhost:5050"
-MODEL_NAME = "Energy_Price_Predictor" # То имя, под которым зарегистрирована модель
+MLFLOW_URI = "http://localhost:5000"
+# Используйте Run ID из последнего лога: ae096b4827084a2ab3c52ae843392129
+RUN_ID = "ae096b4827084a2ab3c52ae843392129" 
 
 def prepare_inference_data(df):
-    """Подготовка одной строки данных для предсказания"""
-    # Убеждаемся, что время в нужном формате
-    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+    """Подготовка данных с автоматическим выбором признаков"""
+    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True).dt.tz_convert('Europe/Brussels')
     df = df.sort_values('timestamp')
 
-    # Те же признаки, что и при обучении
-    df['hour'] = df['timestamp'].dt.hour
-    df['day_of_week'] = df['timestamp'].dt.dayofweek
+    # 1. Календарь и праздники
+    be_holidays = holidays.BE()
+    df['is_holiday'] = df['timestamp'].apply(lambda x: 1 if x in be_holidays else 0)
+    df['is_weekend'] = (df['timestamp'].dt.dayofweek >= 5).astype(int)
     df['month'] = df['timestamp'].dt.month
-    df['weekend'] = (df['day_of_week'] >= 5).astype(int)
 
-    # Лаги
-    for lag in [1, 2, 3, 6, 12, 24]:
+    # 2. Лаги
+    for lag in [1, 2, 24, 48, 168]:
         df[f'price_lag_{lag}'] = df['price'].shift(lag)
 
-    # Скользящие окна
-    df['rolling_mean_24'] = df['price'].rolling(24).mean()
-    df['rolling_std_24'] = df['price'].rolling(24).std()
+    # 3. Скользящие окна
+    df['rolling_mean_24h'] = df['price'].rolling(window=24).mean()
+    df['rolling_std_24h'] = df['price'].rolling(window=24).std()
+    
+    # 4. Погодные взаимодействия
+    df['temp_diff_24h'] = df['temperature_2m'].diff(24)
+    df['wind_power_idx'] = df['wind_speed_10m'] * df['pressure_msl']
 
-    # Циклические признаки
-    df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
-    df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
-    df['day_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
-    df['day_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
+    # 5. Циклические признаки
+    hour = df['timestamp'].dt.hour
+    day = df['timestamp'].dt.dayofweek
+    df['hour_sin'] = np.sin(2 * np.pi * hour / 24)
+    df['hour_cos'] = np.cos(2 * np.pi * hour / 24)
+    df['day_sin'] = np.sin(2 * np.pi * day / 7)
+    df['day_cos'] = np.cos(2 * np.pi * day / 7)
 
-    # Берем только последнюю строку (самый свежий момент времени)
+    # Автоматическое определение колонок (как в train_final.py)
+    exclude = ['timestamp', 'price', 'hour', 'day_of_week']
+    feature_columns = [c for c in df.columns if c not in exclude]
+    
     last_row = df.tail(1).copy()
-    
-    # Список признаков должен СТРОГО совпадать с тем, что было в train_optimized.py
-    feature_columns = [
-        'month', 'weekend', 'hour_sin', 'hour_cos', 'day_sin', 'day_cos',
-        'price_lag_1', 'price_lag_2', 'price_lag_3', 'price_lag_6', 'price_lag_12', 'price_lag_24',
-        'rolling_mean_24', 'rolling_std_24', 'temperature_2m', 'wind_speed_10m', 'pressure_msl'
-    ]
-    
-    return last_row[feature_columns]
+    return last_row[feature_columns].astype(np.float64)
 
 def main():
-    # 1. Подключаемся к MLflow
     mlflow.set_tracking_uri(MLFLOW_URI)
     
-    # 2. Загружаем модель из реестра (версия 'latest')
-    print(f"Loading model '{MODEL_NAME}'...")
-    try:
-        model = mlflow.sklearn.load_model(f"models:/{MODEL_NAME}/latest")
-    except Exception as e:
-        print(f"Error: Could not load model. Make sure you registered it in UI. {e}")
-        return
+    # Загружаем модель
+    model_uri = f"runs:/{RUN_ID}/model"
+    print(f"Loading XGBoost model from run {RUN_ID}...")
+    
+    model = mlflow.xgboost.load_model(model_uri)
 
-    # 3. Читаем последние данные
+    # Получаем имена признаков напрямую из модели, чтобы не гадать
+    # Это самый надежный способ избежать KeyError
+    try:
+        expected_features = model.get_booster().feature_names
+    except:
+        expected_features = None
+
     data_path = ROOT_DIR / 'data/raw/merged_energy_weather_2024.csv'
     df_raw = pd.read_csv(data_path)
     
-    # 4. Готовим фичи
     X_inference = prepare_inference_data(df_raw)
     
-    # 5. Делаем предсказание
+    # Если модель ожидает конкретный порядок признаков
+    if expected_features:
+        X_inference = X_inference[expected_features]
+    
     prediction = model.predict(X_inference)
     
-    print("\n" + "="*30)
-    print(f"PREDICTION FOR NEXT HOUR:")
+    print("\n" + "="*40)
+    print(f"ENERGY PRICE PREDICTION:")
+    print(f"Forecast for the next available hour")
     print(f"Estimated Price: {prediction[0]:.2f} EUR/MWh")
-    print("="*30)
+    print("="*40)
 
 if __name__ == "__main__":
     main()

@@ -6,9 +6,11 @@ import mlflow
 import mlflow.sklearn
 from pathlib import Path
 import matplotlib.pyplot as plt
+import os
 
 # Определяем корневую директорию проекта
 ROOT_DIR = Path(__file__).parent.parent.parent
+TRACKING_URI = "http://127.0.0.1:5000"
 
 def load_and_prepare_data(file_path):
     """Загрузка данных, очистка и создание временных лагов"""
@@ -53,14 +55,17 @@ def create_features(df):
 
 def setup_mlflow():
     """Настройка подключения к MLflow и получение ID эксперимента"""
-    mlflow.set_tracking_uri("http://localhost:5050")
+    mlflow.set_tracking_uri(TRACKING_URI)
     experiment_name = "Energy Price Prediction with Lags"
     
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-    if experiment:
-        return experiment.experiment_id
-    else:
-        return mlflow.create_experiment(experiment_name)
+    try:
+        experiment = mlflow.get_experiment_by_name(experiment_name)
+        if experiment:
+            return experiment.experiment_id
+        else:
+            return mlflow.create_experiment(experiment_name)
+    except Exception:
+        return "0" # Возвращаем Default эксперимент при ошибке связи
 
 def plot_predictions(y_test, y_pred, save_path):
     """Визуализация: сравнение факта и прогноза"""
@@ -77,6 +82,10 @@ def plot_predictions(y_test, y_pred, save_path):
     plt.close()
 
 def main():
+    # 0. Подготовка окружения для Mac
+    if not os.path.exists('mlruns'):
+        os.makedirs('mlruns', exist_ok=True)
+
     # 1. Путь к данным
     data_path = ROOT_DIR / 'data/raw/merged_energy_weather_2024.csv'
     if not data_path.exists():
@@ -121,33 +130,43 @@ def main():
 
     # 7. Логирование в MLflow
     experiment_id = setup_mlflow()
-    with mlflow.start_run(experiment_id=experiment_id):
-        # Логируем параметры
-        mlflow.log_params({
-            "model_type": "RandomForest",
-            "n_estimators": 200,
-            "max_depth": 15,
-            "use_lags": True,
-            "use_weather": True
-        })
+    print(f"📡 Sending data to MLflow (URI: {TRACKING_URI})...")
+    
+    try:
+        with mlflow.start_run(experiment_id=experiment_id):
+            # Логируем параметры
+            mlflow.log_params({
+                "model_type": "RandomForest",
+                "n_estimators": 200,
+                "max_depth": 15,
+                "use_lags": True,
+                "use_weather": True
+            })
 
-        # Логируем метрики
-        mlflow.log_metrics({
-            "r2_score": r2,
-            "mae": mae,
-            "rmse": rmse
-        })
+            # Логируем метрики
+            mlflow.log_metrics({
+                "r2_score": r2,
+                "mae": mae,
+                "rmse": rmse
+            })
 
-        # Логируем важность признаков
-        importances = model.feature_importances_
-        for name, imp in zip(feature_columns, importances):
-            mlflow.log_metric(f"importance_{name}", imp)
+            # Логируем важность признаков
+            importances = model.feature_importances_
+            for name, imp in zip(feature_columns, importances):
+                mlflow.log_metric(f"importance_{name}", imp)
 
-        # Сохраняем модель и график
-        mlflow.sklearn.log_model(model, "rf_lags_weather_model")
-        mlflow.log_artifact(plot_path)
-        
-        print(f"\n Run logged to MLflow (ID: {mlflow.active_run().info.run_id})")
+            # Сохраняем модель и график (с защитой от ошибок путей на Mac)
+            try:
+                # Закомментируй следующую строку, если ошибка Errno 30 не исчезает
+                # mlflow.sklearn.log_model(model, "rf_lags_weather_model")
+                mlflow.log_artifact(str(plot_path))
+                print("📦 Artifacts logged successfully!")
+            except Exception as e:
+                print(f"⚠️ Metrics logged, but artifacts failed: {e}")
+            
+            print(f"\n Run logged to MLflow (ID: {mlflow.active_run().info.run_id})")
+    except Exception as e:
+        print(f"❌ Failed to log to MLflow: {e}")
 
 if __name__ == "__main__":
     main()
