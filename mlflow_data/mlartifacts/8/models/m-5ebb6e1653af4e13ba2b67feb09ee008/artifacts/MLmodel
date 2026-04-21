@@ -1,0 +1,46 @@
+artifact_path: mlflow-artifacts:/8/models/m-5ebb6e1653af4e13ba2b67feb09ee008/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.11.15
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: ubj
+    xgb_version: 3.2.0
+is_signature_from_type_hint: false
+mlflow_version: 3.11.1
+model_id: m-5ebb6e1653af4e13ba2b67feb09ee008
+model_size_bytes: 982523
+model_uuid: m-5ebb6e1653af4e13ba2b67feb09ee008
+prompts: null
+run_id: 7900af5825314a2c9775371eac88ff4e
+signature:
+  inputs: '[{"type": "double", "name": "temperature_2m", "required": true}, {"type":
+    "double", "name": "relative_humidity_2m", "required": true}, {"type": "double",
+    "name": "precipitation", "required": true}, {"type": "double", "name": "rain",
+    "required": true}, {"type": "double", "name": "snowfall", "required": true}, {"type":
+    "double", "name": "cloud_cover", "required": true}, {"type": "double", "name":
+    "wind_speed_10m", "required": true}, {"type": "double", "name": "wind_direction_10m",
+    "required": true}, {"type": "double", "name": "pressure_msl", "required": true},
+    {"type": "double", "name": "month", "required": true}, {"type": "double", "name":
+    "is_holiday", "required": true}, {"type": "double", "name": "is_weekend", "required":
+    true}, {"type": "double", "name": "price_lag_1", "required": true}, {"type": "double",
+    "name": "price_lag_2", "required": true}, {"type": "double", "name": "price_lag_24",
+    "required": true}, {"type": "double", "name": "price_lag_48", "required": true},
+    {"type": "double", "name": "price_lag_168", "required": true}, {"type": "double",
+    "name": "rolling_mean_24h", "required": true}, {"type": "double", "name": "rolling_std_24h",
+    "required": true}, {"type": "double", "name": "temp_diff_24h", "required": true},
+    {"type": "double", "name": "wind_power_idx", "required": true}, {"type": "double",
+    "name": "hour_sin", "required": true}, {"type": "double", "name": "hour_cos",
+    "required": true}, {"type": "double", "name": "day_sin", "required": true}, {"type":
+    "double", "name": "day_cos", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float32", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-04-21 05:36:07.437466'
