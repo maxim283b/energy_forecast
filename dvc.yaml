@@ -1,7 +1,7 @@
 stages:
   ingest:
-    cmd: python src/data/data_loader.py  
+    cmd: python src/data/data_loader.py
     deps:
-      - src/data/data_loader.py          
+    - src/data/data_loader.py
     outs:
-      - data/raw/merged_energy_weather_2024.csv
+    - data/raw/big_energy_dataset_v2.csv
