@@ -1,84 +1,66 @@
+# -*- coding: utf-8 -*-
 import pandas as pd
-import xgboost as xgb
-import mlflow
 import matplotlib.pyplot as plt
 import seaborn as sns
+import mlflow
 import numpy as np
 from pathlib import Path
 
-# --- Конфигурация ---
-BASE_DIR = Path(__file__).resolve().parents[2]
-TRACKING_URI = "http://127.0.0.1:5000"
-EXPERIMENT_NAME = "Energy_Forecast_Final_Success"
-DATA_PATH = BASE_DIR / 'data/processed/energy_ready.csv'
-MODEL_PATH = BASE_DIR / "data/models/model.json"
-
-def main():
-    print(f"--- Запуск расширенной визуализации ---")
-    mlflow.set_tracking_uri(TRACKING_URI)
+def run_visualizations(model, df, reports_dir):
+    """
+    Генерирует графики с обратной трансформацией логарифма (Target Transformation).
+    """
+    sns.set_style("whitegrid")
+    reports_dir.mkdir(parents=True, exist_ok=True)
     
-    # 1. Поиск Run ID и загрузка данных
-    run_id = None
-    exps = mlflow.search_experiments()
-    target_exp = next((e for e in exps if e.name == EXPERIMENT_NAME), None)
-    if target_exp:
-        runs = mlflow.search_runs(experiment_ids=[target_exp.experiment_id], max_results=1)
-        if not runs.empty:
-            run_id = runs.iloc[0].run_id
-
-    df = pd.read_csv(DATA_PATH)
-    X = df.drop(columns=['timestamp', 'price'])
-    y_true = df['price']
+    OFFSET = 50  # Должно совпадать с тем, что в обучении
     
-    # Загрузка модели и предсказание
-    model = xgb.Booster()
-    model.load_model(str(MODEL_PATH))
-    dmat = xgb.DMatrix(X)
-    y_pred = model.predict(dmat)
+    # 1. Подготовка признаков
+    feature_names = model.get_booster().feature_names
+    X = df[feature_names].astype(float)
+    
+    # 2. ПОЛУЧАЕМ ПРЕДСКАЗАНИЯ В ЛОГАРИФМАХ
+    y_pred_log = model.predict(X)
+    
+    # 3. ОБРАТНАЯ ТРАНСФОРМАЦИЯ (Inverse Transform)
+    # Это превратит "5.14" в "120.45"
+    y_pred = np.expm1(y_pred_log) - OFFSET
+    
+    # Реальные значения (они уже должны быть в Евро в колонке 'target')
+    y_true = df['target']
 
-    if run_id:
-        with mlflow.start_run(run_id=run_id):
-            sns.set_style("whitegrid")
+    # --- 1. Feature Importance ---
+    importance = model.get_booster().get_score(importance_type='gain')
+    sorted_imp = sorted(importance.items(), key=lambda x: x[1], reverse=True)[:15]
+    df_imp = pd.DataFrame(sorted_imp, columns=['Feature', 'Importance'])
 
-            # --- ГРАФИК 1: Feature Importance (уже был) ---
-            importance = model.get_score(importance_type='gain')
-            df_imp = pd.DataFrame({'Feature': list(importance.keys()), 'Importance': list(importance.values())}).sort_values('Importance', ascending=False).head(15)
-            fig1, ax1 = plt.subplots(figsize=(10, 6))
-            sns.barplot(data=df_imp, x='Importance', y='Feature', hue='Feature', palette='magma', ax=ax1, legend=False)
-            ax1.set_title("Top Features (Gain)")
-            mlflow.log_figure(fig1, "plots/1_feature_importance.png")
-            plt.close(fig1)
+    fig1, ax1 = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=df_imp, x='Importance', y='Feature', hue='Feature', palette='magma', ax=ax1, legend=False)
+    ax1.set_title("Top 15 Features (Gain)")
+    mlflow.log_figure(fig1, "plots/1_feature_importance.png")
+    plt.close(fig1)
 
-            # --- ГРАФИК 2: Predicted vs Actual (Линия идеального прогноза) ---
-            fig2, ax2 = plt.subplots(figsize=(8, 8))
-            ax2.scatter(y_true, y_pred, alpha=0.3, color='teal')
-            ax2.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
-            ax2.set_xlabel("Actual Price")
-            ax2.set_ylabel("Predicted Price")
-            ax2.set_title("Actual vs Predicted")
-            mlflow.log_figure(fig2, "plots/2_actual_vs_predicted.png")
-            plt.close(fig2)
+    # --- 2. Actual vs Predicted (ТЕПЕРЬ В ЕВРО) ---
+    fig2, ax2 = plt.subplots(figsize=(8, 8))
+    ax2.scatter(y_true, y_pred, alpha=0.3, color='teal', s=10)
+    # Рисуем линию идеального прогноза
+    lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+    ax2.plot(lims, lims, 'r--', lw=2)
+    ax2.set_xlabel("Actual Price (EUR)")
+    ax2.set_ylabel("Predicted Price (EUR)")
+    ax2.set_title(f"Actual vs Predicted (Real Scale)")
+    mlflow.log_figure(fig2, "plots/2_actual_vs_predicted.png")
+    plt.close(fig2)
 
-            # --- ГРАФИК 3: Распределение ошибок (Residuals) ---
-            residuals = y_true - y_pred
-            fig3, ax3 = plt.subplots(figsize=(10, 6))
-            sns.histplot(residuals, kde=True, color='purple', ax=ax3)
-            ax3.set_title("Residuals Distribution (Errors)")
-            ax3.set_xlabel("Error Value")
-            mlflow.log_figure(fig3, "plots/3_residuals_hist.png")
-            plt.close(fig3)
-
-            # --- ГРАФИК 4: Ошибка во времени (Тренды) ---
-            # Берем последние 100 точек для наглядности
-            fig4, ax4 = plt.subplots(figsize=(14, 6))
-            plt.plot(y_true.values[-100:], label='Actual', alpha=0.7)
-            plt.plot(y_pred[-100:], label='Predicted', alpha=0.7, linestyle='--')
-            plt.title("Last 100 Hours: Actual vs Predicted")
-            plt.legend()
-            mlflow.log_figure(fig4, "plots/4_time_series_zoom.png")
-            plt.close(fig4)
-
-            print(f"графики успешно загружены в MLflow Run: {run_id[:8]}")
-
-if __name__ == "__main__":
-    main()
+    # --- 3. Time Series Zoom (Last 100h) ---
+    fig3, ax3 = plt.subplots(figsize=(14, 6))
+    # Берем последние 100 точек
+    plt.plot(y_true.values[-100:], label='Actual', color='black', alpha=0.8, lw=2)
+    plt.plot(y_pred[-100:], label='Predicted', color='orange', linestyle='--', alpha=0.8, lw=2)
+    plt.title("Price Forecast Zoom (Last 100 hours)")
+    plt.ylabel("Price (EUR)")
+    plt.legend()
+    mlflow.log_figure(fig3, "plots/3_time_series_zoom.png")
+    plt.close(fig3)
+    
+    print(f"Графики успешно обновлены и залогированы в MLflow (в шкале EUR).")
