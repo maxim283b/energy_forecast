@@ -1,20 +1,17 @@
 version: '3.8'
 
 services:
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:latest
-    container_name: mlflow_server
+  mlflow_server:
+    image: ghcr.io/mlflow/mlflow:v2.11.3
+    container_name: mlflow_server_energy
     ports:
       - "5000:5000"
     volumes:
-      - ./mlflow_data:/mlflow_work
-    working_dir: /mlflow_work
-    environment:
-      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow_work/mlflow.db
-      - MLFLOW_DEFAULT_ARTIFACT_ROOT=./artifacts
+      - ./mlflow_data/sqlite:/mlflow/db
+      - ./mlflow_data/artifacts:/mlflow/artifacts
     command: >
       mlflow server 
-      --host 0.0.0.0 
-      --backend-store-uri sqlite:///mlflow_work/mlflow.db 
+      --backend-store-uri sqlite:////mlflow/db/mlflow.db 
       --default-artifact-root mlflow-artifacts:/ 
+      --host 0.0.0.0
       --serve-artifacts

@@ -93,3 +93,27 @@ target/
 # DVC files (keep .gitignore for tracking)
 !*.dvc
 !/data/**/.gitignore
+# --- MLOps Specific ---
+
+# MLflow local data and logs
+mlruns/
+mlflow_data/
+mlflow.db
+.method_cache/
+
+# Optimization logs (Optuna/etc)
+optuna.db
+
+# Large data files (даже если папки разрешены, файлы внутри лучше исключить)
+data/**/*.csv
+data/**/*.parquet
+data/**/*.json
+!data/**/.gitkeep
+
+# Исключаем временные модели, если они не в dvc
+data/models/*.json
+data/models/*.xgb
+data/models/*.mlmodel
+
+# Plots (если хочешь хранить их только в MLflow)
+data/plots/*.png

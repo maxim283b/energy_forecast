@@ -1,75 +1,72 @@
-import mlflow
 import pandas as pd
-from pathlib import Path
-from dotenv import load_dotenv
-import os
 import numpy as np
+import xgboost as xgb
+from pathlib import Path
 
-# Загружаем пути и настройки
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / '.env')
+# Определение путей относительно корня проекта
+BASE_DIR = Path(__file__).resolve().parents[2]
+# Тот самый путь, куда мы сохранили модель в train_final.py
+MODEL_PATH = BASE_DIR / "data/models/model.json"
+DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
 
-TRACKING_URI = "http://127.0.0.1:5000"
-MODEL_NAME = "Energy_Forecast_XGB" 
+def predict_local(data: pd.DataFrame):
+    """Загружает модель из локального файла и делает предсказание."""
+    if not MODEL_PATH.exists():
+        print(f"Ошибка: Файл модели не найден по пути {MODEL_PATH}")
+        return None
 
-def predict(data: pd.DataFrame, stage: str = "latest"):
-    mlflow.set_tracking_uri(TRACKING_URI)
-    model_uri = f"models:/{MODEL_NAME}/{stage}"
+    # Загружаем модель XGBoost напрямую
+    try:
+        model = xgb.XGBRegressor()
+        model.load_model(str(MODEL_PATH))
+    except Exception as e:
+        print(f"Ошибка при инициализации модели: {e}")
+        return None
+
+    # Очистка данных: убираем лишнее, что могло попасть из CSV
+    exclude = ['timestamp', 'price']
+    feature_cols = [c for c in data.columns if c not in exclude]
     
-    print(f"Загрузка модели: {model_uri}")
-    try:
-        model = mlflow.pyfunc.load_model(model_uri)
-    except Exception as e:
-        print(f"Ошибка загрузки: {e}")
-        return None
+    # Важно: приводим к float64, чтобы избежать конфликтов типов в XGBoost
+    X = data[feature_cols].astype(np.float64)
 
-    # --- ДИНАМИЧЕСКАЯ ФИЛЬТРАЦИЯ ПРИЗНАКОВ ---
-    # Получаем имена колонок, которые модель ОЖИДАЕТ (из её Signature)
     try:
-        expected_columns = model.metadata.get_input_schema().input_names()
-        print(f"Модель ожидает {len(expected_columns)} признаков.")
-        
-        # Оставляем только нужные колонки в правильном порядке
-        data_filtered = data[expected_columns]
+        predictions = model.predict(X)
+        return predictions
     except Exception as e:
-        print(f"Ошибка приведения данных к схеме модели: {e}")
-        # Если в данных физически нет того, что хочет модель (например, 'hour'),
-        # тут вылетит понятная ошибка KeyError
+        print(f"Ошибка во время предсказания: {e}")
         return None
-
-    # Делаем предсказание на отфильтрованных данных
-    predictions = model.predict(data_filtered)
-    return predictions
 
 def main():
-    # Путь должен быть синхронизирован (ты использовал energy_ready.csv в обучении)
-    input_path = ROOT_DIR / 'data/processed/energy_ready.csv'
+    print(f"--- Запуск инференса (локально) ---")
     
-    if not input_path.exists():
-        print(f"Ошибка: Файл {input_path} не найден.")
+    if not DATA_PATH.exists():
+        print(f"Ошибка: Файл данных {DATA_PATH} не найден.")
         return
 
-    df = pd.read_csv(input_path)
+    # 1. Загрузка данных
+    df = pd.read_csv(DATA_PATH)
     
-    # 2. Подготовка
-    # Теперь нам не нужно гадать с exclude. 
-    # Просто передаем весь DF (кроме целевых), а predict() сам заберет что нужно.
-    X = df.drop(columns=['timestamp', 'price'], errors='ignore')
-
-    # Приводим к float64, так как XGBoost в MLflow часто капризничает к типам
-    X = X.astype(np.float64)
-
-    # 3. Прогноз
-    sample_data = X.tail(5)
-    results = predict(sample_data)
+    # 2. Берем последние 5 строк для примера
+    sample_data = df.tail(5)
+    
+    # 3. Выполняем прогноз
+    results = predict_local(sample_data)
 
     if results is not None:
         print("\n--- Результаты прогноза (последние 5 записей) ---")
         output = pd.DataFrame({
-            'timestamp': df['timestamp'].tail(5),
+            'timestamp': sample_data['timestamp'].values,
             'predicted_price': results
         })
+        # Выводим красиво
         print(output.to_string(index=False))
+        
+        # Опционально: сохраняем результаты
+        output_dir = BASE_DIR / "data/predictions"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output.to_csv(output_dir / "latest_forecast.csv", index=False)
+        print(f"\nРезультаты сохранены в {output_dir}/latest_forecast.csv")
 
 if __name__ == "__main__":
     main()

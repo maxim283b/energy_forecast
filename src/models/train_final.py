@@ -1,110 +1,83 @@
-import os
 import mlflow
 import mlflow.xgboost
-import optuna
 import pandas as pd
-import numpy as np
 import xgboost as xgb
+import numpy as np
 from pathlib import Path
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from mlflow.models.signature import infer_signature
+import os
+from sklearn.metrics import (
+    mean_absolute_error, 
+    r2_score, 
+    mean_squared_error, 
+    mean_absolute_percentage_error,
+    median_absolute_error,
+    max_error
+)
 
-# --- Конфигурация ---
-DATA_PATH = Path('data/processed/energy_ready.csv')
-TRACKING_URI = "http://127.0.0.1:5000"
-EXPERIMENT_NAME = "Energy_Forecast_Production"
-
-def load_processed_data(file_path):
-    if not file_path.exists():
-        raise FileNotFoundError(f"Файл не найден: {file_path}")
-    df = pd.read_csv(file_path)
-    exclude = ['timestamp', 'price']
-    feature_cols = [c for c in df.columns if c not in exclude]
-    X = df[feature_cols].astype(np.float64)
-    y = df['price'].astype(np.float64)
-    return X, y, feature_cols
-
-def objective(trial, X_train, y_train, X_test, y_test):
-    # ВАЖНО: используем nested=True, чтобы не смешивать параметры триалов с главным запуском
-    with mlflow.start_run(nested=True):
-        param = {
-            'n_estimators': trial.suggest_int('n_estimators', 800, 1500),
-            'max_depth': trial.suggest_int('max_depth', 3, 6),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.05, log=True),
-            'subsample': trial.suggest_float('subsample', 0.7, 0.9),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7, 0.9),
-            'tree_method': 'hist',
-            'random_state': 42
-        }
-        
-        # Чтобы автологирование не конфликтовало внутри Optuna, 
-        # можно временно отключить его для триалов или просто логировать метрику вручную
-        model = xgb.XGBRegressor(**param)
-        model.fit(X_train, y_train)
-        
-        preds = model.predict(X_test)
-        mae = mean_absolute_error(y_test, preds)
-        
-        mlflow.log_params(param)
-        mlflow.log_metric("trial_mae", mae)
-        return mae
+ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_PATH = ROOT_DIR / 'data/processed/energy_ready.csv'
 
 def main():
-    mlflow.set_tracking_uri(TRACKING_URI)
-    mlflow.set_experiment(EXPERIMENT_NAME)
-    
-    # Включаем автологирование, но настраиваем его так, 
-    # чтобы оно не мешало ручному логированию в цикле Optuna
-    mlflow.xgboost.autolog(importance_types=['gain'], log_models=False, silent=True)
+    # Настройка окружения
+    os.environ["MLFLOW_ARTIFACT_PROXY_URI"] = "http://127.0.0.1:5000"
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    mlflow.set_experiment("Energy_Forecast_Final_Success")
 
-    print("--- 1. Загрузка подготовленных данных ---")
-    X, y, feature_cols = load_processed_data(DATA_PATH)
+    # 1. Загрузка данных
+    df = pd.read_csv(DATA_PATH)
+    X = df.drop(columns=['timestamp', 'price'])
+    y = df['price']
     
     split = int(len(X) * 0.8)
     X_train, X_test = X[:split], X[split:]
     y_train, y_test = y[:split], y[split:]
 
-    # Один главный запуск для всего процесса
-    with mlflow.start_run(run_name="Final_Model_Training") as run:
-        
-        print("--- 2. Поиск гиперпараметров (Optuna) ---")
-        # Отключаем автологирование на время поиска, чтобы избежать INVALID_PARAMETER_VALUE
-        mlflow.xgboost.autolog(disable=True)
-        
-        study = optuna.create_study(direction='minimize')
-        study.optimize(lambda t: objective(t, X_train, y_train, X_test, y_test), n_trials=20)
+    with mlflow.start_run(run_name="Professional_Log_Full"):
+        params = {
+            "n_estimators": 1308,
+            "max_depth": 3,
+            "learning_rate": 0.014,
+            "subsample": 0.72,
+            "colsample_bytree": 0.84,
+            "random_state": 42
+        }
+        mlflow.log_params(params)
 
-        print("--- 3. Обучение финальной модели ---")
-        # Снова включаем автологирование для финального обучения
-        mlflow.xgboost.autolog(disable=False, log_models=False)
+        # 2. Обучение
+        model = xgb.XGBRegressor(**params)
+        model.fit(X_train, y_train)
         
-        # Логируем лучшие параметры в основной run
-        mlflow.log_params(study.best_params)
-        
-        final_model = xgb.XGBRegressor(**study.best_params, random_state=42, tree_method='hist')
-        final_model.fit(X_train, y_train)
-        
-        y_pred = final_model.predict(X_test)
+        # 3. Предсказание
+        y_pred = model.predict(X_test)
+
+        # 4. Расчет расширенных метрик
         metrics = {
             "mae": mean_absolute_error(y_test, y_pred),
             "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
-            "r2": r2_score(y_test, y_pred)
+            "r2": r2_score(y_test, y_pred),
+            "mape": mean_absolute_percentage_error(y_test, y_pred),
+            "median_ae": median_absolute_error(y_test, y_pred),
+            "max_error": max_error(y_test, y_pred)
         }
-        mlflow.log_metrics(metrics)
-        print(f"Финальные результаты: MAE={metrics['mae']:.2f}, R2={metrics['r2']:.2f}")
 
-        # --- Регистрация модели ---
+        # Логируем всё одним словарем
+        mlflow.log_metrics(metrics)
+
+        # 5. Логирование модели
         signature = infer_signature(X_test, y_pred)
         mlflow.xgboost.log_model(
-            final_model, 
+            xgb_model=model,
             artifact_path="model",
             signature=signature,
-            registered_model_name="Energy_Forecast_XGB"
+            registered_model_name="Energy_Price_Model_V1"
         )
         
-        print(f"Модель зарегистрирована. Run ID: {run.info.run_id}")
-
-    print("\nОбучение успешно завершено.")
+        print("-" * 30)
+        for name, value in metrics.items():
+            print(f"{name.upper()}: {value:.4f}")
+        print("-" * 30)
+        print("Все метрики и модель успешно отправлены в MLflow!")
 
 if __name__ == "__main__":
     main()

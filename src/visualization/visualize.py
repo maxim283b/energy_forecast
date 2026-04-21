@@ -1,110 +1,84 @@
 import pandas as pd
+import xgboost as xgb
+import mlflow
 import matplotlib.pyplot as plt
 import seaborn as sns
-import mlflow
-import mlflow.xgboost
-from pathlib import Path
 import numpy as np
+from pathlib import Path
 
-# Настройка путей
-ROOT_DIR = Path(__file__).resolve().parents[2]
-DATA_PATH = ROOT_DIR / 'data/processed/energy_ready.csv'
-REPORT_DIR = ROOT_DIR / 'reports/figures'
+# --- Конфигурация ---
+BASE_DIR = Path(__file__).resolve().parents[2]
 TRACKING_URI = "http://127.0.0.1:5000"
-MODEL_NAME = "Energy_Forecast_XGB"
-
-def plot_feature_importance(model, feature_names):
-    """
-    Визуализация важности признаков. 
-    Работает с нативным XGBRegressor загруженным через mlflow.xgboost
-    """
-    # Для XGBRegressor важность всегда в .feature_importances_
-    # Если это Booster (редко), берем через get_score()
-    if hasattr(model, "feature_importances_"):
-        importances = model.feature_importances_
-    else:
-        # Фолбэк для нативного бустера
-        score = model.get_booster().get_score(importance_type='gain')
-        importances = [score.get(f, 0) for f in feature_names]
-    
-    importance_df = pd.DataFrame({
-        'Feature': feature_names,
-        'Importance': importances
-    }).sort_values(by='Importance', ascending=False)
-
-    plt.figure(figsize=(10, 8))
-    sns.barplot(x='Importance', y='Feature', data=importance_df.head(15), palette='viridis')
-    plt.title('Top 15 Feature Importance (Gain)')
-    plt.tight_layout()
-    
-    file_path = REPORT_DIR / 'feature_importance.png'
-    plt.savefig(file_path)
-    plt.close()
-    
-    mlflow.log_artifact(str(file_path))
-    print(f"-> График важности сохранен: {file_path}")
-
-def plot_predictions(y_true, y_pred):
-    """График сравнения прогноза и факта"""
-    plt.figure(figsize=(14, 6))
-    
-    actual = y_true.values[-168:]
-    predicted = y_pred[-168:]
-    
-    plt.plot(actual, label='Actual Price', color='royalblue', linewidth=2, alpha=0.8)
-    plt.plot(predicted, label='Predicted Price', color='darkorange', linestyle='--', linewidth=2)
-    
-    plt.title('Energy Price: Actual vs Predicted (Last 7 Days)')
-    plt.xlabel('Time (Hours)')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    
-    file_path = REPORT_DIR / 'actual_vs_pred.png'
-    plt.savefig(file_path)
-    plt.close()
-    
-    mlflow.log_artifact(str(file_path))
-    print(f"-> График прогнозов сохранен: {file_path}")
+EXPERIMENT_NAME = "Energy_Forecast_Final_Success"
+DATA_PATH = BASE_DIR / 'data/processed/energy_ready.csv'
+MODEL_PATH = BASE_DIR / "data/models/model.json"
 
 def main():
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"--- Запуск расширенной визуализации ---")
     mlflow.set_tracking_uri(TRACKING_URI)
     
-    print("--- 1. Загрузка модели и данных ---")
-    model_uri = f"models:/{MODEL_NAME}/latest"
-    
-    # КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Загружаем именно через mlflow.xgboost
-    # Это вернет нам объект XGBRegressor со всеми его атрибутами
-    try:
-        model = mlflow.xgboost.load_model(model_uri)
-    except Exception as e:
-        print(f"Не удалось загрузить как xgboost, пробуем pyfunc: {e}")
-        model = mlflow.pyfunc.load_model(model_uri)
-
-    # Достаем признаки
-    if hasattr(model, "feature_names_in_"):
-        # Если модель от Scikit-Learn API
-        expected_features = model.feature_names_in_.tolist()
-    else:
-        # Пытаемся достать из бустера
-        expected_features = model.get_booster().feature_names
-        
-    print(f"Модель ожидает {len(expected_features)} признаков")
+    # 1. Поиск Run ID и загрузка данных
+    run_id = None
+    exps = mlflow.search_experiments()
+    target_exp = next((e for e in exps if e.name == EXPERIMENT_NAME), None)
+    if target_exp:
+        runs = mlflow.search_runs(experiment_ids=[target_exp.experiment_id], max_results=1)
+        if not runs.empty:
+            run_id = runs.iloc[0].run_id
 
     df = pd.read_csv(DATA_PATH)
-    X = df[expected_features].astype(np.float64)
-    y = df['price']
+    X = df.drop(columns=['timestamp', 'price'])
+    y_true = df['price']
     
-    print("--- 2. Генерация отчета ---")
-    preds = model.predict(X)
-    
-    with mlflow.start_run(run_name="Visualization_Report"):
-        plot_feature_importance(model, expected_features)
-        plot_predictions(y, preds)
+    # Загрузка модели и предсказание
+    model = xgb.Booster()
+    model.load_model(str(MODEL_PATH))
+    dmat = xgb.DMatrix(X)
+    y_pred = model.predict(dmat)
 
-    print("\nВизуализация успешно завершена.")
+    if run_id:
+        with mlflow.start_run(run_id=run_id):
+            sns.set_style("whitegrid")
+
+            # --- ГРАФИК 1: Feature Importance (уже был) ---
+            importance = model.get_score(importance_type='gain')
+            df_imp = pd.DataFrame({'Feature': list(importance.keys()), 'Importance': list(importance.values())}).sort_values('Importance', ascending=False).head(15)
+            fig1, ax1 = plt.subplots(figsize=(10, 6))
+            sns.barplot(data=df_imp, x='Importance', y='Feature', hue='Feature', palette='magma', ax=ax1, legend=False)
+            ax1.set_title("Top Features (Gain)")
+            mlflow.log_figure(fig1, "plots/1_feature_importance.png")
+            plt.close(fig1)
+
+            # --- ГРАФИК 2: Predicted vs Actual (Линия идеального прогноза) ---
+            fig2, ax2 = plt.subplots(figsize=(8, 8))
+            ax2.scatter(y_true, y_pred, alpha=0.3, color='teal')
+            ax2.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
+            ax2.set_xlabel("Actual Price")
+            ax2.set_ylabel("Predicted Price")
+            ax2.set_title("Actual vs Predicted")
+            mlflow.log_figure(fig2, "plots/2_actual_vs_predicted.png")
+            plt.close(fig2)
+
+            # --- ГРАФИК 3: Распределение ошибок (Residuals) ---
+            residuals = y_true - y_pred
+            fig3, ax3 = plt.subplots(figsize=(10, 6))
+            sns.histplot(residuals, kde=True, color='purple', ax=ax3)
+            ax3.set_title("Residuals Distribution (Errors)")
+            ax3.set_xlabel("Error Value")
+            mlflow.log_figure(fig3, "plots/3_residuals_hist.png")
+            plt.close(fig3)
+
+            # --- ГРАФИК 4: Ошибка во времени (Тренды) ---
+            # Берем последние 100 точек для наглядности
+            fig4, ax4 = plt.subplots(figsize=(14, 6))
+            plt.plot(y_true.values[-100:], label='Actual', alpha=0.7)
+            plt.plot(y_pred[-100:], label='Predicted', alpha=0.7, linestyle='--')
+            plt.title("Last 100 Hours: Actual vs Predicted")
+            plt.legend()
+            mlflow.log_figure(fig4, "plots/4_time_series_zoom.png")
+            plt.close(fig4)
+
+            print(f"графики успешно загружены в MLflow Run: {run_id[:8]}")
 
 if __name__ == "__main__":
     main()
