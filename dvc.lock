@@ -1,0 +1,14 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python src/data/data_loader.py
+    deps:
+    - path: src/data/data_loader.py
+      hash: md5
+      md5: fe2a9513c5cd69dd597c0033a2e55578
+      size: 5254
+    outs:
+    - path: data/raw/big_energy_dataset_v2.csv
+      hash: md5
+      md5: f9282af9b596712b6ec496bcbc9b4b09
+      size: 2769185
