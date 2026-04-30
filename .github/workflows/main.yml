@@ -54,12 +54,10 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_ID=$GDRIVE_CLIENT_ID
-          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_SECRET=$GDRIVE_CLIENT_SECRET
-          export DVC_REMOTE_STORAGE_GDRIVE_REFRESH_TOKEN=$GDRIVE_REFRESH_TOKEN
-          
-          # Просто dvc pull без уточнения путей — это самый надежный вариант
-          dvc pull
+          # Используем флаг --config, чтобы внедрить токены прямо в рантайм
+          dvc pull --config "remote.storage.gdrive_client_id=$GDRIVE_CLIENT_ID" \
+                   --config "remote.storage.gdrive_client_secret=$GDRIVE_CLIENT_SECRET" \
+                   --config "remote.storage.gdrive_refresh_token=$GDRIVE_REFRESH_TOKEN"
 
       - name: Build Docker image
         run: |
