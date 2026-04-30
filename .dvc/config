@@ -1,4 +1,7 @@
 [core]
-    remote = local_remote
+    remote = storage
 ['remote "local_remote"']
     url = /tmp/dvc_storage
+['remote "storage"']
+    url = gdrive://1rmKFGnxc7_v241n82OFcuic9ZZGzs9Tq
+    gdrive_acknowledge_abuse = true

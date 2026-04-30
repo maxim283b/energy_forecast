@@ -25,7 +25,7 @@ jobs:
 
       - name: Run Lint (flake8)
         run: |
-          # Остановит сборку, если есть ошибки синтаксиса или неопределенные переменные
+          # Остановит сборку, если есть ошибки синтаксиса
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # Предупреждения (стандарт PEP8)
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
@@ -37,7 +37,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Важно для DVC, чтобы видеть историю
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -46,14 +46,21 @@ jobs:
 
       - name: Install DVC
         run: |
-          pip install dvc[s3] # Замени [s3] на [gdrive] или [gs], если используешь их
+          pip install "dvc[gdrive]"
 
       - name: Pull data from DVC
         env:
-          # Добавь секреты в GitHub Settings -> Secrets, если используешь облако
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: dvc pull
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+        run: |
+          # Настраиваем локальную авторизацию через секреты
+          dvc remote modify storage --local gdrive_client_id $GDRIVE_CLIENT_ID
+          dvc remote modify storage --local gdrive_client_secret $GDRIVE_CLIENT_SECRET
+          dvc remote modify storage --local gdrive_refresh_token $GDRIVE_REFRESH_TOKEN
+          
+          # Скачиваем веса моделей
+          dvc pull data/models
 
       - name: Build Docker image
         run: |
