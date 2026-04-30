@@ -91,4 +91,5 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t energy-api-service:latest -f docker/Dockerfile .
+          # Теперь указываем правильный путь к файлу в корне
+          docker build -t energy-api-service:latest -f Dockerfile .
