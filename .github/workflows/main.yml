@@ -52,12 +52,13 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # Используем проверенный метод настройки через --local
-          dvc remote modify storage --local gdrive_client_id $GDRIVE_CLIENT_ID
-          dvc remote modify storage --local gdrive_client_secret $GDRIVE_CLIENT_SECRET
-          dvc remote modify storage --local gdrive_refresh_token $GDRIVE_REFRESH_TOKEN
+          # DVC_REMOTE_<NAME>_<PARAM> — это стандартный формат
+          # Убедись, что в dvc config remote называется именно "storage"
+          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_ID=$GDRIVE_CLIENT_ID
+          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_SECRET=$GDRIVE_CLIENT_SECRET
+          export DVC_REMOTE_STORAGE_GDRIVE_REFRESH_TOKEN=$GDRIVE_REFRESH_TOKEN
           
-          # Тянем данные
+          # Запускаем pull. Теперь он не должен ругаться на конфиг
           dvc pull
 
       - name: Debug and Fix Structure
