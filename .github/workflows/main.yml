@@ -52,44 +52,22 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # 1. Создаем директорию для кэша pydrive2
-          mkdir -p ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/
+          # Используем проверенный метод настройки через --local
+          dvc remote modify storage --local gdrive_client_id $GDRIVE_CLIENT_ID
+          dvc remote modify storage --local gdrive_client_secret $GDRIVE_CLIENT_SECRET
+          dvc remote modify storage --local gdrive_refresh_token $GDRIVE_REFRESH_TOKEN
           
-          # 2. Генерируем json-файл с токеном
-          echo "{
-            \"access_token\": \"dummy\",
-            \"client_id\": \"$GDRIVE_CLIENT_ID\",
-            \"client_secret\": \"$GDRIVE_CLIENT_SECRET\",
-            \"refresh_token\": \"$GDRIVE_REFRESH_TOKEN\",
-            \"token_expiry\": \"2020-01-01T00:00:00Z\",
-            \"token_uri\": \"https://oauth2.googleapis.com/token\",
-            \"token_response\": {
-              \"access_token\": \"dummy\",
-              \"expires_in\": 3599,
-              \"refresh_token\": \"$GDRIVE_REFRESH_TOKEN\",
-              \"scope\": \"https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.appdata\",
-              \"token_type\": \"Bearer\"
-            },
-            \"scopes\": [
-              \"https://www.googleapis.com/auth/drive\",
-              \"https://www.googleapis.com/auth/drive.appdata\"
-            ],
-            \"invalid\": false,
-            \"_class\": \"OAuth2Credentials\",
-            \"_module\": \"oauth2client.client\"
-          }" > ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/default.json
-
-          # 3. Скачиваем данные
+          # Тянем данные
           dvc pull
 
-      - name: Debug file structure
+      - name: Debug and Fix Structure
         run: |
-          echo "Current directory structure:"
-          ls -R
-          echo "Checking data/models folder:"
-          ls -la data/models || echo "Folder data/models not found"
+          echo "Проверяем наличие модели:"
+          ls -R data/
+          # На случай, если папка data/models создалась пустой, проверим это
+          mkdir -p data/models
 
       - name: Build Docker image
         run: |
-          # Убеждаемся, что Dockerfile в корне и контекст сборки верный
+          # Собираем образ. Если Dockerfile в корне, путь -f Dockerfile верный.
           docker build -t energy-api-service:latest -f Dockerfile .
