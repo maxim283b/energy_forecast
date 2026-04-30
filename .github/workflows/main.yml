@@ -52,23 +52,28 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # DVC_REMOTE_<NAME>_<PARAM> — это стандартный формат
-          # Убедись, что в dvc config remote называется именно "storage"
-          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_ID=$GDRIVE_CLIENT_ID
-          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_SECRET=$GDRIVE_CLIENT_SECRET
-          export DVC_REMOTE_STORAGE_GDRIVE_REFRESH_TOKEN=$GDRIVE_REFRESH_TOKEN
+          # 1. Создаем папку (путь взят точно из твоего лога ошибки)
+          mkdir -p ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/
           
-          # Запускаем pull. Теперь он не должен ругаться на конфиг
-          dvc pull
+          # 2. Пишем JSON с обязательным полем user_agent
+          cat <<EOF > ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/default.json
+          {
+            "client_id": "$GDRIVE_CLIENT_ID",
+            "client_secret": "$GDRIVE_CLIENT_SECRET",
+            "refresh_token": "$GDRIVE_REFRESH_TOKEN",
+            "user_agent": "dvc-pydrive2",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "token_response": {
+              "access_token": "dummy",
+              "refresh_token": "$GDRIVE_REFRESH_TOKEN"
+            }
+          }
+          EOF
 
-      - name: Debug and Fix Structure
-        run: |
-          echo "Проверяем наличие модели:"
-          ls -R data/
-          # На случай, если папка data/models создалась пустой, проверим это
-          mkdir -p data/models
+          # 3. Указываем DVC использовать этот кэш
+          dvc pull
 
       - name: Build Docker image
         run: |
-          # Собираем образ. Если Dockerfile в корне, путь -f Dockerfile верный.
+          # Используем путь к Dockerfile в корне
           docker build -t energy-api-service:latest -f Dockerfile .
