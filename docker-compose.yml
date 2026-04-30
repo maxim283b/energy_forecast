@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Сервис трекинга экспериментов
   mlflow_server:
     image: ghcr.io/mlflow/mlflow:v2.11.3
     container_name: mlflow_server_energy
@@ -15,3 +16,16 @@ services:
       --default-artifact-root mlflow-artifacts:/ 
       --host 0.0.0.0
       --serve-artifacts
+
+  energy_api:
+    build: .
+    container_name: energy_api_service
+    depends_on:
+      - mlflow_server
+    ports:
+      - "8080:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow_server:5000
+    volumes:
+      - ./data/models:/app/data/models  # Позволяет обновлять модель без пересборки контейнера
+    restart: always
