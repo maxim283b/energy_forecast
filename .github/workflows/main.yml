@@ -39,4 +39,4 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t energy-api-service:latest -f docker/Dockerfile .
+          docker build -t energy-api-service:latest .
