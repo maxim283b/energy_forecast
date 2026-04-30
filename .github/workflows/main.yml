@@ -54,10 +54,40 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # Используем флаг --config, чтобы внедрить токены прямо в рантайм
-          dvc pull --config "remote.storage.gdrive_client_id=$GDRIVE_CLIENT_ID" \
-                   --config "remote.storage.gdrive_client_secret=$GDRIVE_CLIENT_SECRET" \
-                   --config "remote.storage.gdrive_refresh_token=$GDRIVE_REFRESH_TOKEN"
+          # 1. Создаем директорию для кэша pydrive2
+          mkdir -p ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/
+          
+          # 2. Генерируем json-файл с токеном вручную
+          echo "{
+            \"access_token\": \"dummy\",
+            \"client_id\": \"$GDRIVE_CLIENT_ID\",
+            \"client_secret\": \"$GDRIVE_CLIENT_SECRET\",
+            \"refresh_token\": \"$GDRIVE_REFRESH_TOKEN\",
+            \"token_expiry\": \"2020-01-01T00:00:00Z\",
+            \"token_uri\": \"https://oauth2.googleapis.com/token\",
+            \"user_agent\": null,
+            \"revoke_uri\": \"https://oauth2.googleapis.com/revoke\",
+            \"id_token\": null,
+            \"id_token_jwt\": null,
+            \"token_response\": {
+              \"access_token\": \"dummy\",
+              \"expires_in\": 3599,
+              \"refresh_token\": \"$GDRIVE_REFRESH_TOKEN\",
+              \"scope\": \"https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.appdata\",
+              \"token_type\": \"Bearer\"
+            },
+            \"scopes\": [
+              \"https://www.googleapis.com/auth/drive\",
+              \"https://www.googleapis.com/auth/drive.appdata\"
+            ],
+            \"token_info_uri\": \"https://oauth2.googleapis.com/tokeninfo\",
+            \"invalid\": false,
+            \"_class\": \"OAuth2Credentials\",
+            \"_module\": \"oauth2client.client\"
+          }" > ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/default.json
+
+          # 3. Теперь DVC "подхватит" этот файл и не полезет в браузер
+          dvc pull
 
       - name: Build Docker image
         run: |
