@@ -58,7 +58,8 @@ jobs:
           export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_SECRET=$GDRIVE_CLIENT_SECRET
           export DVC_REMOTE_STORAGE_GDRIVE_REFRESH_TOKEN=$GDRIVE_REFRESH_TOKEN
           
-          dvc pull data/models
+          # Просто dvc pull без уточнения путей — это самый надежный вариант
+          dvc pull
 
       - name: Build Docker image
         run: |
