@@ -25,9 +25,7 @@ jobs:
 
       - name: Run Lint (flake8)
         run: |
-          # Остановит сборку, если есть ошибки синтаксиса
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Предупреждения (стандарт PEP8)
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
   build-docker:
@@ -54,10 +52,10 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # 1. Создаем директорию для кэша pydrive2 (путь взят из логов GitHub Actions)
+          # 1. Создаем директорию для кэша pydrive2
           mkdir -p ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/
           
-          # 2. Генерируем json-файл. Добавлено поле user_agent, чтобы избежать KeyError
+          # 2. Генерируем json-файл с токеном (исправленный формат)
           echo "{
             \"access_token\": \"dummy\",
             \"client_id\": \"$GDRIVE_CLIENT_ID\",
@@ -66,9 +64,6 @@ jobs:
             \"token_expiry\": \"2020-01-01T00:00:00Z\",
             \"token_uri\": \"https://oauth2.googleapis.com/token\",
             \"user_agent\": \"dvc-pydrive2\",
-            \"revoke_uri\": \"https://oauth2.googleapis.com/revoke\",
-            \"id_token\": null,
-            \"id_token_jwt\": null,
             \"token_response\": {
               \"access_token\": \"dummy\",
               \"expires_in\": 3599,
@@ -80,16 +75,15 @@ jobs:
               \"https://www.googleapis.com/auth/drive\",
               \"https://www.googleapis.com/auth/drive.appdata\"
             ],
-            \"token_info_uri\": \"https://oauth2.googleapis.com/tokeninfo\",
             \"invalid\": false,
             \"_class\": \"OAuth2Credentials\",
             \"_module\": \"oauth2client.client\"
           }" > ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/default.json
 
-          # 3. Пулл данных
+          # 3. Тянем данные
           dvc pull
 
       - name: Build Docker image
         run: |
-          # Собираем образ, используя Dockerfile в корне проекта
+          # Убеждаемся, что Dockerfile в корне и мы копируем всё дерево проекта
           docker build -t energy-api-service:latest -f Dockerfile .
