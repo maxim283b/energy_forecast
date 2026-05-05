@@ -52,14 +52,16 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # 1. Настраиваем параметры во временном (local) конфиге прямо перед пуллом
-          # Это обходит ошибку "extra keys not allowed", так как меняет локальный файл сессии
-          dvc remote modify storage gdrive_client_id "$GDRIVE_CLIENT_ID" --local
-          dvc remote modify storage gdrive_client_secret "$GDRIVE_CLIENT_SECRET" --local
-          dvc remote modify storage gdrive_refresh_token "$GDRIVE_REFRESH_TOKEN" --local
+          # Мы НЕ вызываем dvc remote modify.
+          # Мы задаем переменные окружения, которые DVC подхватит САМ.
+          # Формат: DVC_REMOTE_<NAME>_<PARAM_NAME> (все в верхнем регистре)
           
-          # 2. Пулл с принудительным использованием конфига
-          dvc pull -v
+          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_ID=$GDRIVE_CLIENT_ID
+          export DVC_REMOTE_STORAGE_GDRIVE_CLIENT_SECRET=$GDRIVE_CLIENT_SECRET
+          export DVC_REMOTE_STORAGE_GDRIVE_REFRESH_TOKEN=$GDRIVE_REFRESH_TOKEN
+          
+          # Запускаем pull. Теперь DVC увидит токены в окружении и не полезет в конфиг.
+          dvc pull
 
       - name: Build Docker image
         run: |
