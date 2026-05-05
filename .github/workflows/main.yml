@@ -52,28 +52,16 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # 1. Создаем папку (путь взят точно из твоего лога ошибки)
-          mkdir -p ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/
+          # 1. Настраиваем параметры во временном (local) конфиге прямо перед пуллом
+          # Это обходит ошибку "extra keys not allowed", так как меняет локальный файл сессии
+          dvc remote modify storage gdrive_client_id "$GDRIVE_CLIENT_ID" --local
+          dvc remote modify storage gdrive_client_secret "$GDRIVE_CLIENT_SECRET" --local
+          dvc remote modify storage gdrive_refresh_token "$GDRIVE_REFRESH_TOKEN" --local
           
-          # 2. Пишем JSON с обязательным полем user_agent
-          cat <<EOF > ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/default.json
-          {
-            "client_id": "$GDRIVE_CLIENT_ID",
-            "client_secret": "$GDRIVE_CLIENT_SECRET",
-            "refresh_token": "$GDRIVE_REFRESH_TOKEN",
-            "user_agent": "dvc-pydrive2",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "token_response": {
-              "access_token": "dummy",
-              "refresh_token": "$GDRIVE_REFRESH_TOKEN"
-            }
-          }
-          EOF
-
-          # 3. Указываем DVC использовать этот кэш
-          dvc pull
+          # 2. Пулл с принудительным использованием конфига
+          dvc pull -v
 
       - name: Build Docker image
         run: |
-          # Используем путь к Dockerfile в корне
+          # Собираем образ из корня
           docker build -t energy-api-service:latest -f Dockerfile .
