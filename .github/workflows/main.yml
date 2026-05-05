@@ -85,5 +85,6 @@ jobs:
 
       - name: Build Docker image
         run: |
+          mkdir -p data/models data/raw
           # Убеждаемся, что Dockerfile в корне и мы копируем всё дерево проекта
           docker build -t energy-api-service:latest -f Dockerfile .
