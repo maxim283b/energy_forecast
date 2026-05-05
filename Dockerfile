@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://dow
 # Копируем исходный код и модель
 # Важно: Docker должен видеть папку src и data
 COPY src/ ./src/
-COPY data/models/ ./data/models/
+COPY data/ ./data/
 COPY app/ ./app/
 
 # Открываем порт для FastAPI
