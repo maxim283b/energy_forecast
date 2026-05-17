@@ -61,6 +61,7 @@ jobs:
           # 2. Привязываем remote к custom OAuth client
           dvc remote modify --local storage gdrive_client_id "$GDRIVE_CLIENT_ID"
           dvc remote modify --local storage gdrive_client_secret "$GDRIVE_CLIENT_SECRET"
+          dvc remote modify --local storage gdrive_user_credentials_file "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/default.json"
 
           # 3. Создаем директорию для кэша pydrive2 под текущий OAuth client
           mkdir -p "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/"
@@ -68,27 +69,27 @@ jobs:
           # 4. Генерируем json-файл с токеном (исправленный формат)
           cat > "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/default.json" <<EOF
           {
-            \"access_token\": \"dummy\",
-            \"client_id\": \"$GDRIVE_CLIENT_ID\",
-            \"client_secret\": \"$GDRIVE_CLIENT_SECRET\",
-            \"refresh_token\": \"$GDRIVE_REFRESH_TOKEN\",
-            \"token_expiry\": \"2020-01-01T00:00:00Z\",
-            \"token_uri\": \"https://oauth2.googleapis.com/token\",
-            \"user_agent\": \"dvc-pydrive2\",
-            \"token_response\": {
-              \"access_token\": \"dummy\",
-              \"expires_in\": 3599,
-              \"refresh_token\": \"$GDRIVE_REFRESH_TOKEN\",
-              \"scope\": \"https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.appdata\",
-              \"token_type\": \"Bearer\"
+            "access_token": "dummy",
+            "client_id": "$GDRIVE_CLIENT_ID",
+            "client_secret": "$GDRIVE_CLIENT_SECRET",
+            "refresh_token": "$GDRIVE_REFRESH_TOKEN",
+            "token_expiry": "2020-01-01T00:00:00Z",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "user_agent": "dvc-pydrive2",
+            "token_response": {
+              "access_token": "dummy",
+              "expires_in": 3599,
+              "refresh_token": "$GDRIVE_REFRESH_TOKEN",
+              "scope": "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.appdata",
+              "token_type": "Bearer"
             },
-            \"scopes\": [
-              \"https://www.googleapis.com/auth/drive\",
-              \"https://www.googleapis.com/auth/drive.appdata\"
+            "scopes": [
+              "https://www.googleapis.com/auth/drive",
+              "https://www.googleapis.com/auth/drive.appdata"
             ],
-            \"invalid\": false,
-            \"_class\": \"OAuth2Credentials\",
-            \"_module\": \"oauth2client.client\"
+            "invalid": false,
+            "_class": "OAuth2Credentials",
+            "_module": "oauth2client.client"
           }
           EOF
 
