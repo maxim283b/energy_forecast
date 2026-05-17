@@ -58,10 +58,14 @@ jobs:
             exit 1
           fi
 
-          # 2. Создаем директорию для кэша pydrive2 под текущий OAuth client
+          # 2. Привязываем remote к custom OAuth client
+          dvc remote modify --local storage gdrive_client_id "$GDRIVE_CLIENT_ID"
+          dvc remote modify --local storage gdrive_client_secret "$GDRIVE_CLIENT_SECRET"
+
+          # 3. Создаем директорию для кэша pydrive2 под текущий OAuth client
           mkdir -p "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/"
 
-          # 3. Генерируем json-файл с токеном (исправленный формат)
+          # 4. Генерируем json-файл с токеном (исправленный формат)
           cat > "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/default.json" <<EOF
           {
             \"access_token\": \"dummy\",
@@ -88,7 +92,7 @@ jobs:
           }
           EOF
 
-          # 4. Тянем данные
+          # 5. Тянем данные
           dvc pull
 
       - name: Build Docker image
