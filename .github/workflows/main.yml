@@ -52,11 +52,18 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
           GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          # 1. Создаем директорию для кэша pydrive2
-          mkdir -p ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/
-          
-          # 2. Генерируем json-файл с токеном (исправленный формат)
-          echo "{
+          # 1. Проверяем, что DVC Google credentials переданы
+          if [ -z "$GDRIVE_CLIENT_ID" ] || [ -z "$GDRIVE_CLIENT_SECRET" ] || [ -z "$GDRIVE_REFRESH_TOKEN" ]; then
+            echo "Missing DVC Google Drive credentials"
+            exit 1
+          fi
+
+          # 2. Создаем директорию для кэша pydrive2 под текущий OAuth client
+          mkdir -p "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/"
+
+          # 3. Генерируем json-файл с токеном (исправленный формат)
+          cat > "$HOME/.cache/pydrive2fs/$GDRIVE_CLIENT_ID/default.json" <<EOF
+          {
             \"access_token\": \"dummy\",
             \"client_id\": \"$GDRIVE_CLIENT_ID\",
             \"client_secret\": \"$GDRIVE_CLIENT_SECRET\",
@@ -78,9 +85,10 @@ jobs:
             \"invalid\": false,
             \"_class\": \"OAuth2Credentials\",
             \"_module\": \"oauth2client.client\"
-          }" > ~/.cache/pydrive2fs/710796635688-iivsgbgsb6uv1fap6635dhvuei09o66c.apps.googleusercontent.com/default.json
+          }
+          EOF
 
-          # 3. Тянем данные
+          # 4. Тянем данные
           dvc pull
 
       - name: Build Docker image
