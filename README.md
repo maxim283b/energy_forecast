@@ -1,10 +1,10 @@
 # Energy Forecast
-MLOps project for electricity price prediction using Random Forest and automated pipelines.
+MLOps project for electricity price prediction using XGBoost and automated pipelines.
 
 ## Инфраструктура проекта
-* **Python:** 3.14 (зависимости зафиксированы в `requirements.txt`).
-* **MLflow:** Развернут через Docker Compose для трекинга экспериментов и управления реестром моделей (Model Registry).
-* **DVC:** Внедрена система контроля версий данных и автоматизации пайплайнов (Data Version Control).
+* **Python:** 3.11 (зависимости зафиксированы в `requirements.txt`).
+* **MLflow:** Развернут через Docker Compose для трекинга экспериментов и управления реестром моделей.
+* **DVC:** Внедрена система контроля версий данных и автоматизации пайплайнов.
 
 ## Быстрый старт
 
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 ``` bash
 # Запуск MLflow сервера (требуется Docker)
 docker-compose up -d
-# Интерфейс MLflow доступен по адресу: http://localhost:5050
+# Интерфейс MLflow доступен по адресу: http://localhost:5000
 ```
 
 ### 3. Запуск пайплайна
@@ -38,7 +38,7 @@ docker-compose up -d
 ``` bash
 dvc repro
 ```
-DVC проверит зависимости и запустит только измененные этапы (ingest -> train).
+DVC проверит зависимости и запустит этапы пайплайна: `ingest -> clean -> featurize -> train`.
 
 ### 4. Структура проекта
 
@@ -51,10 +51,9 @@ DVC проверит зависимости и запустит только и�
 ├── notebooks/          <- Jupyter Notebooks для EDA и черновиков.
 ├── reports/            <- Отчеты и сгенерированные графики (figures).
 ├── src/                <- Исходный код:
-│   ├── data_ingestion/ <- Парсеры (entsoe_parser.py, open_meteo.py).
-│   ├── training/       <- Скрипты обучения (train_optimized.py и др.).
-│   ├── inference/      <- Скрипт для предсказаний (predict.py).
+│   ├── data/           <- Загрузка и очистка данных.
 │   ├── features/       <- Скрипты генерации признаков.
+│   ├── models/         <- Скрипты обучения и локального инференса.
 │   └── visualization/  <- Код для построения графиков.
 ├── dvc.yaml            <- Конфигурация пайплайна.
 ├── dvc.lock            <- Фиксация состояний данных.
@@ -68,7 +67,37 @@ DVC проверит зависимости и запустит только и�
 После регистрации модели в MLflow, вы можете получить прогноз на следующий час:
 
 ``` bash
-python src/inference/predict.py
+python src/models/predict_model.py
+```
+
+### 2. Запуск переобучения
+
+Для запуска текущего training pipeline доступен endpoint:
+
+``` bash
+POST /v1/retrain
+```
+
+Пример body:
+
+``` json
+{
+  "dataset": "data/processed/energy_ready.csv",
+  "force": true
+}
+```
+
+Ответ:
+
+``` json
+{
+  "status": "started",
+  "job_id": "<id>",
+  "command": "python .../src/models/train_optuna.py",
+  "tracking_uri": "http://localhost:5000",
+  "dataset": "data/processed/energy_ready.csv",
+  "force": true
+}
 ```
 
 ### 1. Текущие метрики
@@ -78,7 +107,7 @@ python src/inference/predict.py
 
 2. MAE: 14.42 EUR/MWh
 
-3. Model: RandomForest (depth=12, n_estimators=300)
+3. Model: XGBoost
 
 
 ### 3. Трекинг в MLflow
@@ -88,7 +117,7 @@ python src/inference/predict.py
 ``` python
 import mlflow
 
-mlflow.set_tracking_uri("http://localhost:5050")
+mlflow.set_tracking_uri("http://localhost:5000")
 mlflow.set_experiment("energy_prediction_optimized")
 
 with mlflow.start_run():
