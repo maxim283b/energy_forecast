@@ -7,12 +7,13 @@ from pathlib import Path
 # Определение корневой директории проекта
 ROOT_DIR = Path(__file__).resolve().parent
 
+
 def run_script(script_path, args=None):
     """
     Запускает скрипт Python как отдельный процесс.
     """
     full_path = ROOT_DIR / script_path
-    
+
     # Проверка существования файла скрипта
     if not full_path.exists():
         print(f"Ошибка: Скрипт не найден по пути {full_path}")
@@ -21,9 +22,9 @@ def run_script(script_path, args=None):
     cmd = [sys.executable, str(full_path)]
     if args:
         cmd.extend(args)
-    
+
     print(f"--- Запуск этапа: {script_path} ---")
-    
+
     try:
         # Запуск процесса с передачей вывода в текущий терминал
         subprocess.run(cmd, check=True, text=True)
@@ -32,12 +33,13 @@ def run_script(script_path, args=None):
         print(f"Ошибка при выполнении {script_path}: {e}")
         sys.exit(1)
 
+
 def main():
     """
     Основной пайплайн проекта.
     Последовательность: Сбор -> Очистка -> Признаки -> Обучение
     """
-    
+
     # 1. Загрузка данных (Data Ingestion)
     # Создает файл data/raw/big_energy_dataset_v2.csv
     run_script("src/data/data_loader.py")
@@ -46,7 +48,7 @@ def main():
     # ПРОВЕРКА: Какое имя файла выдал загрузчик?
     raw_v1 = "data/raw/merged_energy_weather_2024.csv"
     raw_v2 = "data/raw/big_energy_dataset_v2.csv"
-    
+
     # Выбираем тот файл, который реально существует на диске
     if (ROOT_DIR / raw_v2).exists():
         input_raw = raw_v2
@@ -73,9 +75,16 @@ def main():
 
     print("Пайплайн MLOps успешно выполнен полностью.")
 
+
 if __name__ == "__main__":
     # Проверка и создание необходимых директорий
-    for folder in ["data/raw", "data/interim", "data/processed", "data/models", "reports/figures"]:
+    for folder in [
+        "data/raw",
+        "data/interim",
+        "data/processed",
+        "data/models",
+        "reports/figures",
+    ]:
         os.makedirs(ROOT_DIR / folder, exist_ok=True)
-        
+
     main()

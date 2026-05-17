@@ -34,6 +34,7 @@ if MODEL_PATH.exists():
 else:
     logger.warning("Model file not found!")
 
+
 # Схема данных (все те фичи, которые требовал XGBoost)
 class PredictionInput(BaseModel):
     hour_sin: float
@@ -77,28 +78,32 @@ class RetrainResponse(BaseModel):
     dataset: str
     force: bool
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_loaded": MODEL_LOADED}
+
 
 @app.post("/predict")
 def predict(input_data: PredictionInput):
     try:
         # Преобразуем Pydantic модель в DataFrame
         X = pd.DataFrame([input_data.model_dump()])
-        
+
         # Предсказание
         pred_log = model.predict(X)
-        
+
         # Обратное преобразование (exp(x) - 1) и учет смещения OFFSET=50
         # Важно: убедись, что OFFSET вычитается именно в таком порядке
         final_price = np.expm1(pred_log) - 50
-        
+
         return {"predicted_price": float(final_price[0])}
-    
+
     except Exception as e:
         logger.error(f"Prediction error: {e}")
-        raise HTTPException(status_code=500, detail=f"Model prediction failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Model prediction failed: {str(e)}"
+        )
 
 
 @app.post("/v1/retrain", response_model=RetrainResponse, status_code=202)
@@ -121,7 +126,9 @@ def retrain(request: RetrainRequest):
         )
     except Exception as e:
         logger.error(f"Retrain start error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start retrain: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to start retrain: {str(e)}"
+        )
 
     return RetrainResponse(
         status="started",
