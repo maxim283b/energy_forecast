@@ -12,3 +12,56 @@ stages:
       hash: md5
       md5: f9282af9b596712b6ec496bcbc9b4b09
       size: 2769185
+  clean:
+    cmd: python src/data/make_dataset.py data/raw/big_energy_dataset_v2.csv 
+      data/interim/energy_cleaned.csv
+    deps:
+    - path: data/raw/big_energy_dataset_v2.csv
+      hash: md5
+      md5: f9282af9b596712b6ec496bcbc9b4b09
+      size: 2769185
+    - path: src/data/make_dataset.py
+      hash: md5
+      md5: 86837021bad253aefd05cfd1b04f81f4
+      size: 3823
+    outs:
+    - path: data/interim/energy_cleaned.csv
+      hash: md5
+      md5: 5d094c288813cf99de8f65eb782e6504
+      size: 2730851
+  featurize:
+    cmd: python src/features/build_features.py
+    deps:
+    - path: data/interim/energy_cleaned.csv
+      hash: md5
+      md5: 5d094c288813cf99de8f65eb782e6504
+      size: 2730851
+    - path: src/features/build_features.py
+      hash: md5
+      md5: efca9ee9bc605acd0abd1820d08e3183
+      size: 4862
+    outs:
+    - path: data/processed/energy_ready.csv
+      hash: md5
+      md5: 7ae36ebf494d66ee05b002bcb5965b7f
+      size: 7401507
+  train:
+    cmd: python src/models/train_optuna.py
+    deps:
+    - path: data/processed/energy_ready.csv
+      hash: md5
+      md5: 7ae36ebf494d66ee05b002bcb5965b7f
+      size: 7401507
+    - path: src/models/train_optuna.py
+      hash: md5
+      md5: acd89e239abf74faf917f3c0afd37a7a
+      size: 5468
+    - path: src/visualization/visualize.py
+      hash: md5
+      md5: 52dac88310375bc93b8a928bb54b9f2c
+      size: 2871
+    outs:
+    - path: data/models/model.json
+      hash: md5
+      md5: 826408ddb80444acba1824ea96be871c
+      size: 4580025
