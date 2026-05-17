@@ -18,3 +18,7 @@ python-dotenv
 httpx
 pydantic
 pydantic-settings
+
+# Testing
+pytest
+pytest-asyncio  # пригодится, если начнешь использовать async в FastAPI
