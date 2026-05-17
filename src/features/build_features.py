@@ -5,7 +5,8 @@ import holidays
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-INPUT_PATH = BASE_DIR / 'data/raw/big_energy_dataset_v2.csv'
+INTERIM_PATH = BASE_DIR / 'data/interim/energy_cleaned.csv'
+RAW_PATH = BASE_DIR / 'data/raw/big_energy_dataset_v2.csv'
 OUTPUT_PATH = BASE_DIR / 'data/processed/energy_ready.csv'
 
 def add_time_features(df):
@@ -71,11 +72,12 @@ def add_lags_and_rolling(df):
 
 def main():
     print("--- Start Feature Engineering: Cross-Border & Physics Protocol ---")
-    if not INPUT_PATH.exists():
-        print(f"Error: {INPUT_PATH} not found")
+    input_path = INTERIM_PATH if INTERIM_PATH.exists() else RAW_PATH
+    if not input_path.exists():
+        print(f"Error: {input_path} not found")
         return
 
-    df = pd.read_csv(INPUT_PATH)
+    df = pd.read_csv(input_path)
     
     # Ограничение выбросов (Clipping)
     upper_limit = df['price'].quantile(0.99)
