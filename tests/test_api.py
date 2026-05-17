@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+import app.main as main_module
+
+app = main_module.app
 
 client = TestClient(app)
 
@@ -36,7 +38,22 @@ def test_prediction_endpoint():
     if response.status_code == 200:
         assert "predicted_price" in response.json()
 
-def test_retrain_endpoint_missing():
-    """Проверка, что несуществующий эндпоинт все еще 404"""
-    response = client.post("/v1/retrain", json={"dataset": "test"})
-    assert response.status_code == 404
+def test_retrain_endpoint_starts_job(monkeypatch):
+    """Проверка запуска retrain без реального старта процесса."""
+    calls = []
+
+    class DummyPopen:
+        def __init__(self, *args, **kwargs):
+            calls.append({"args": args, "kwargs": kwargs})
+
+    monkeypatch.setattr(main_module.subprocess, "Popen", DummyPopen)
+
+    response = client.post("/v1/retrain", json={"dataset": "data/processed/energy_ready.csv", "force": True})
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["status"] == "started"
+    assert payload["dataset"] == "data/processed/energy_ready.csv"
+    assert payload["force"] is True
+    assert payload["tracking_uri"] == "http://localhost:5000"
+    assert calls

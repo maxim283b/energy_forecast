@@ -5,6 +5,7 @@ import xgboost as xgb
 import mlflow
 import optuna
 import numpy as np
+import os
 from pathlib import Path
 from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
@@ -25,7 +26,7 @@ MODEL_SAVE_PATH = BASE_DIR / "data/models/model.json"
 REPORTS_DIR = BASE_DIR / "reports/figures"
 OFFSET = 50  # Смещение для работы с отрицательными ценами
 
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 mlflow.set_experiment("Energy_Forecast_Final")
 
 def objective(trial, X, y):

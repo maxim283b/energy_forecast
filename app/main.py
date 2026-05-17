@@ -5,6 +5,10 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import logging
+import os
+import subprocess
+import sys
+import uuid
 
 # Настраиваем логи
 logging.basicConfig(level=logging.INFO)
@@ -13,12 +17,17 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Energy Forecast API")
 
 MODEL_PATH = Path("data/models/model.json")
+MODEL_LOADED = False
+BASE_DIR = Path(__file__).resolve().parents[1]
+TRAIN_SCRIPT = BASE_DIR / "src" / "models" / "train_optuna.py"
+DEFAULT_MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
 # Загружаем модель
 model = xgb.XGBRegressor()
 if MODEL_PATH.exists():
     try:
         model.load_model(str(MODEL_PATH))
+        MODEL_LOADED = True
         logger.info(f"Model loaded successfully from {MODEL_PATH}")
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
@@ -54,9 +63,23 @@ class PredictionInput(BaseModel):
     price_mean_24h: float
     price_std_24h: float
 
+
+class RetrainRequest(BaseModel):
+    dataset: str = "data/processed/energy_ready.csv"
+    force: bool = False
+
+
+class RetrainResponse(BaseModel):
+    status: str
+    job_id: str
+    command: str
+    tracking_uri: str
+    dataset: str
+    force: bool
+
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": MODEL_PATH.exists()}
+    return {"status": "ok", "model_loaded": MODEL_LOADED}
 
 @app.post("/predict")
 def predict(input_data: PredictionInput):
@@ -76,3 +99,35 @@ def predict(input_data: PredictionInput):
     except Exception as e:
         logger.error(f"Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"Model prediction failed: {str(e)}")
+
+
+@app.post("/v1/retrain", response_model=RetrainResponse, status_code=202)
+def retrain(request: RetrainRequest):
+    if not TRAIN_SCRIPT.exists():
+        raise HTTPException(status_code=404, detail="Training script not found")
+
+    job_id = uuid.uuid4().hex
+    command = [sys.executable, str(TRAIN_SCRIPT)]
+    env = os.environ.copy()
+    env["MLFLOW_TRACKING_URI"] = DEFAULT_MLFLOW_TRACKING_URI
+
+    try:
+        subprocess.Popen(
+            command,
+            cwd=str(BASE_DIR),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        logger.error(f"Retrain start error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start retrain: {str(e)}")
+
+    return RetrainResponse(
+        status="started",
+        job_id=job_id,
+        command=" ".join(command),
+        tracking_uri=DEFAULT_MLFLOW_TRACKING_URI,
+        dataset=request.dataset,
+        force=request.force,
+    )
