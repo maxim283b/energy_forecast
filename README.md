@@ -1,95 +1,108 @@
 # Energy Forecast
-MLOps project for electricity price prediction using XGBoost and automated pipelines.
+MLOps-проект для прогноза цены электроэнергии на базе XGBoost с DVC, MLflow, FastAPI и Docker.
 
-## Инфраструктура проекта
-* **Python:** 3.11 (зависимости зафиксированы в `requirements.txt`).
-* **MLflow:** Развернут через Docker Compose для трекинга экспериментов и управления реестром моделей.
-* **DVC:** Внедрена система контроля версий данных и автоматизации пайплайнов.
+## Что уже есть
+- Python 3.11.
+- Пайплайн данных: `ingest -> clean -> featurize -> train`.
+- MLflow для трекинга экспериментов, метрик и модели.
+- DVC для версионирования данных и воспроизводимого запуска пайплайна.
+- FastAPI-сервис с `/health`, `/predict` и `POST /v1/retrain`.
+- Docker Compose для локального запуска MLflow и API.
+- Helm-манифесты и ArgoCD-манифест для деплоя.
+
+## Последние результаты модели
+Последний сохранённый run в MLflow:
+
+- `MAE`: `16.6152`
+- `R2`: `0.7552`
+- `RMSE`: `23.6070`
+
+Последняя модель сохранена в:
+
+- `data/models/model.json`
+
+Эксперимент MLflow:
+
+- `Energy_Forecast_Final`
+
+## Структура проекта
+```text
+├── app/                 <- FastAPI приложение
+├── data/
+│   ├── raw/             <- исходные данные
+│   ├── interim/         <- очищенные данные
+│   ├── processed/       <- признаки для обучения
+│   ├── models/          <- сохранённая модель
+│   └── predictions/     <- локальные результаты инференса
+├── docs/                <- документация
+├── helm/energy-api/     <- Helm chart для API
+├── k8s/mlflow/          <- Kubernetes-манифест MLflow
+├── reports/figures/     <- графики обучения и визуализации
+├── src/
+│   ├── data/            <- загрузка и очистка данных
+│   ├── features/        <- генерация признаков
+│   ├── models/          <- обучение и локальный инференс
+│   └── visualization/   <- графики и отчёты
+├── tests/               <- API-тесты
+├── dvc.yaml             <- DVC pipeline
+├── dvc.lock             <- зафиксированное состояние пайплайна
+├── docker-compose.yml   <- локальный запуск MLflow и API
+└── README.md
+```
 
 ## Быстрый старт
 
-### 1. Настройка окружения
+### 1. Установка зависимостей
 ```bash
-# Клонирование репозитория
-git clone [https://github.com/maxim283b/energy_forecast.git](https://github.com/maxim283b/energy_forecast.git)
+git clone https://github.com/maxim283b/energy_forecast.git
 cd energy_forecast
 
-# Создание виртуального окружения
 python -m venv venv
-source venv/bin/activate  # Для Mac/Linux
-# venv\Scripts\activate   # Для Windows
+source venv/bin/activate
 
-# Установка зависимостей
 pip install -r requirements.txt
 ```
 
-### 2. Запуск сервисов 
-
-``` bash
-# Запуск MLflow сервера (требуется Docker)
-docker-compose up -d
-# Интерфейс MLflow доступен по адресу: http://localhost:5000
+### 2. Запуск MLflow
+```bash
+docker compose up -d mlflow_server
 ```
 
-### 3. Запуск пайплайна
+MLflow доступен по адресу:
 
-Для автоматического сбора данных и переобучения модели используйте одну команду:
+- `http://localhost:5000`
 
-``` bash
+### 3. Запуск API локально
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+Проверка health:
+```bash
+curl http://127.0.0.1:8001/health
+```
+
+### 4. Запуск всего пайплайна
+```bash
 dvc repro
 ```
-DVC проверит зависимости и запустит этапы пайплайна: `ingest -> clean -> featurize -> train`.
 
-### 4. Структура проекта
+Команда последовательно запускает:
 
-``` text
-├── data/
-│   ├── processed/      <- Обработанные данные (готовые для обучения).
-│   └── raw/            <- Исходные данные из API (под контролем DVC).
-├── docs/               <- Документация проекта (Sphinx/RST).
-├── models/             <- Место хранения локальных весов моделей.
-├── notebooks/          <- Jupyter Notebooks для EDA и черновиков.
-├── reports/            <- Отчеты и сгенерированные графики (figures).
-├── src/                <- Исходный код:
-│   ├── data/           <- Загрузка и очистка данных.
-│   ├── features/       <- Скрипты генерации признаков.
-│   ├── models/         <- Скрипты обучения и локального инференса.
-│   └── visualization/  <- Код для построения графиков.
-├── dvc.yaml            <- Конфигурация пайплайна.
-├── dvc.lock            <- Фиксация состояний данных.
-├── docker-compose.yml  <- Запуск MLflow сервера.
-└── README.md           <- Эта инструкция.
-```
+- `ingest`
+- `clean`
+- `featurize`
+- `train`
 
-## Использование и результаты
-
-### 1. Предсказание (Inference)
-После регистрации модели в MLflow, вы можете получить прогноз на следующий час:
-
-``` bash
-python src/models/predict_model.py
-```
-
-### 2. Запуск переобучения
-
-Для запуска текущего training pipeline доступен endpoint:
-
-``` bash
-POST /v1/retrain
-```
-
-Пример body:
-
-``` json
-{
-  "dataset": "data/processed/energy_ready.csv",
-  "force": true
-}
+### 5. Переобучение через API
+```bash
+curl -X POST http://127.0.0.1:8001/v1/retrain \
+  -H "Content-Type: application/json" \
+  -d '{"dataset":"data/processed/energy_ready.csv","force":true}'
 ```
 
 Ответ:
-
-``` json
+```json
 {
   "status": "started",
   "job_id": "<id>",
@@ -100,27 +113,52 @@ POST /v1/retrain
 }
 ```
 
-### 1. Текущие метрики
-Благодаря Feature Engineering (циклические признаки и лаги), достигнуты следующие показатели:
-
-1. R2 Score: 0.637
-
-2. MAE: 14.42 EUR/MWh
-
-3. Model: XGBoost
-
-
-### 3. Трекинг в MLflow
-
-Для ручного логирования новых экспериментов используется стандартный блок:
-
-``` python
-import mlflow
-
-mlflow.set_tracking_uri("http://localhost:5000")
-mlflow.set_experiment("energy_prediction_optimized")
-
-with mlflow.start_run():
-    mlflow.log_param("n_estimators", 300)
-    mlflow.log_metric("r2", 0.637)
+### 6. Локальный инференс
+```bash
+python src/models/predict_model.py
 ```
+
+Скрипт берёт данные из `data/processed/energy_ready.csv`, делает прогноз и сохраняет результат в:
+
+- `data/predictions/latest_forecast.csv`
+
+## MLflow
+Tracking URI:
+
+- локально: `http://localhost:5000`
+- внутри Docker Compose: `http://mlflow_server:5000`
+
+Модель и метрики логируются в MLflow вручную из `src/models/train_optuna.py`:
+
+- params
+- metrics
+- model artifact
+
+## DVC
+Текущий remote:
+
+- `storage`
+- `gdrive://1cQPF0AXQ5FrwZTMjFsoFMbn0qnjGxSDR/dvcstore`
+
+Для локальной работы и CI используются Google Drive OAuth credentials:
+
+- `GDRIVE_CLIENT_ID`
+- `GDRIVE_CLIENT_SECRET`
+- `GDRIVE_REFRESH_TOKEN`
+
+## Эндпоинты
+- `GET /health`
+- `POST /predict`
+- `POST /v1/retrain`
+
+## Проверка качества
+```bash
+python3 -m pytest tests -q
+python3 -m compileall app src tests test_infra.py test_environment.py
+```
+
+## Что не входит в текущую реализацию
+- web UI
+- автоматический drift monitoring
+- автоматический retrain по порогам drift/метрик
+
