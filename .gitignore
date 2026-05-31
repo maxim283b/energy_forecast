@@ -79,7 +79,16 @@ target/
 # exclude data from source control by default
 /data/*
 !/data/raw/
-!/data/processed/
+!/data/processed/.gitkeep
+data/processed/*.csv
+data/interim/*.csv
+data/models/*
+!data/models/.gitkeep
+data/predictions/*.csv
+reports/figures/*
+!reports/figures/.gitkeep
+reports/drift/*
+!reports/drift/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store
@@ -97,6 +106,7 @@ target/
 
 # MLflow local data and logs
 mlruns/
+mlflow/
 mlflow_data/
 mlflow.db
 .method_cache/

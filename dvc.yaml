@@ -5,3 +5,41 @@ stages:
     - src/data/data_loader.py
     outs:
     - data/raw/big_energy_dataset_v2.csv
+  clean:
+    cmd: python src/data/make_dataset.py data/raw/big_energy_dataset_v2.csv data/interim/energy_cleaned.csv
+    deps:
+    - src/data/make_dataset.py
+    - data/raw/big_energy_dataset_v2.csv
+    outs:
+    - data/interim/energy_cleaned.csv
+  features:
+    cmd: python src/features/build_features.py
+    deps:
+    - src/features/build_features.py
+    - data/raw/big_energy_dataset_v2.csv
+    outs:
+    - data/processed/energy_ready.csv
+  train:
+    cmd: python src/models/train_optuna.py
+    deps:
+    - src/models/train_optuna.py
+    - src/visualization/visualize.py
+    - data/processed/energy_ready.csv
+    outs:
+    - data/models/model.json
+  predict:
+    cmd: python src/models/predict_model.py
+    deps:
+    - src/models/predict_model.py
+    - data/models/model.json
+    - data/processed/energy_ready.csv
+    outs:
+    - data/predictions/latest_forecast.csv
+  monitor:
+    cmd: python src/monitoring/generate_reports.py
+    deps:
+    - src/monitoring/generate_reports.py
+    - data/processed/energy_ready.csv
+    - data/predictions/latest_forecast.csv
+    outs:
+    - reports/drift

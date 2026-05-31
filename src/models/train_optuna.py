@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import pandas as pd
 import xgboost as xgb
@@ -25,7 +26,7 @@ MODEL_SAVE_PATH = BASE_DIR / "data/models/model.json"
 REPORTS_DIR = BASE_DIR / "reports/figures"
 OFFSET = 50  # Смещение для работы с отрицательными ценами
 
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5050"))
 mlflow.set_experiment("Energy_Forecast_Final")
 
 def objective(trial, X, y):

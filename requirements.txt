@@ -144,7 +144,7 @@ propcache==0.4.1
 proto-plus==1.27.2
 protobuf==4.25.9
 psutil==7.2.2
-pyarrow==13.0.0
+pyarrow>=4.0.0,<14
 pyasn1==0.6.3
 pyasn1_modules==0.4.2
 pycodestyle==2.14.0
@@ -218,3 +218,5 @@ xgboost==3.2.0
 yarl==1.23.0
 zc.lockfile==4.0
 zipp==3.23.0
+evidently>=0.4,<0.5
+streamlit==1.39.0

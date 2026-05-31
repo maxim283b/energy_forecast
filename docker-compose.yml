@@ -1,11 +1,10 @@
-version: '3.8'
-
 services:
   mlflow_server:
     image: ghcr.io/mlflow/mlflow:v2.11.3
     container_name: mlflow_server_energy
+    # На macOS порт 5000 часто занят AirPlay (ControlCenter) — используем 5050
     ports:
-      - "5000:5000"
+      - "5050:5000"
     volumes:
       - ./mlflow_data/sqlite:/mlflow/db
       - ./mlflow_data/artifacts:/mlflow/artifacts

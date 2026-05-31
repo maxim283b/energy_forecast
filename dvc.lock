@@ -1,0 +1,87 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python src/data/data_loader.py
+    deps:
+    - path: src/data/data_loader.py
+      hash: md5
+      md5: fe2a9513c5cd69dd597c0033a2e55578
+      size: 5254
+    outs:
+    - path: data/raw/big_energy_dataset_v2.csv
+      hash: md5
+      md5: f9282af9b596712b6ec496bcbc9b4b09
+      size: 2769185
+  clean:
+    cmd: python src/data/make_dataset.py data/raw/big_energy_dataset_v2.csv 
+      data/interim/energy_cleaned.csv
+    deps:
+    - path: data/raw/big_energy_dataset_v2.csv
+      hash: md5
+      md5: f9282af9b596712b6ec496bcbc9b4b09
+      size: 2769185
+    - path: src/data/make_dataset.py
+      hash: md5
+      md5: 86837021bad253aefd05cfd1b04f81f4
+      size: 3823
+    outs:
+    - path: data/interim/energy_cleaned.csv
+      hash: md5
+      md5: 5d094c288813cf99de8f65eb782e6504
+      size: 2730851
+  features:
+    cmd: python src/features/build_features.py
+    deps:
+    - path: data/raw/big_energy_dataset_v2.csv
+      hash: md5
+      md5: f9282af9b596712b6ec496bcbc9b4b09
+      size: 2769185
+    - path: src/features/build_features.py
+      hash: md5
+      md5: cd2dce1ae39c37bf741d2f59226b5015
+      size: 4734
+    outs:
+    - path: data/processed/energy_ready.csv
+      hash: md5
+      md5: 97964be82f9d9890b883fe48acd9d0a9
+      size: 7397685
+  train:
+    cmd: python src/models/train_optuna.py
+    deps:
+    - path: data/processed/energy_ready.csv
+      hash: md5
+      md5: 97964be82f9d9890b883fe48acd9d0a9
+      size: 7397685
+    - path: src/models/train_optuna.py
+      hash: md5
+      md5: ef88a65f7f65d17754e537469cf004cf
+      size: 5467
+    - path: src/visualization/visualize.py
+      hash: md5
+      md5: 52dac88310375bc93b8a928bb54b9f2c
+      size: 2871
+    outs:
+    - path: data/models/model.json
+      hash: md5
+      md5: 7a28a2275847173dd1d9142913d4bfd6
+      size: 3503627
+  predict:
+    cmd: python src/models/predict_model.py
+    deps:
+    - path: data/models/model.json
+      hash: md5
+      md5: 7a28a2275847173dd1d9142913d4bfd6
+      size: 3503627
+    - path: data/processed/energy_ready.csv
+      hash: md5
+      md5: 97964be82f9d9890b883fe48acd9d0a9
+      size: 7397685
+    - path: src/models/predict_model.py
+      hash: md5
+      md5: 7785dccbbb2b1dc67427e77d2e859f66
+      size: 3061
+    outs:
+    - path: data/predictions/latest_forecast.csv
+      hash: md5
+      md5: e85c1ef8cf9bd82fea5539575769ea3c
+      size: 204
