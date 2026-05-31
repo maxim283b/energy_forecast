@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/maxim283b/energy_forecast.git'
-    targetRevision: HEAD
+    targetRevision: develop
     path: helm/energy-api
   destination:
     server: 'https://kubernetes.default.svc'
