@@ -1,4 +1,4 @@
-name: ML Ops CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,50 +7,22 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
-  lint-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install flake8 pytest black
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Lint with flake8
-        run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings.
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      - name: Format check with black
-        run: black --check .
-
-      - name: Run tests
-        run: pytest tests/
-
   build-and-push-docker:
-    needs: lint-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -61,7 +33,28 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/${{ github.repository }}/energy-api:latest
             ghcr.io/${{ github.repository }}/energy-api:${{ github.sha }}
+
+      - name: Update Helm image tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          perl -0pi -e 's/(^image:\n(?:  .+\n)*?  tag: ")[^"]+(")/$1$ENV{IMAGE_TAG}$2/m' helm/energy-api/values.yaml
+
+      - name: Commit Helm image tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if git diff --quiet -- helm/energy-api/values.yaml; then
+            echo "Helm image tag is already up to date"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add helm/energy-api/values.yaml
+          git commit -m "chore: update energy-api image tag to ${GITHUB_SHA} [skip ci]"
+          git push

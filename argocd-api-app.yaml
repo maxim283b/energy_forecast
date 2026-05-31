@@ -6,13 +6,13 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/maxim283b/energy_forecast.git' 
+    repoURL: 'https://github.com/maxim283b/energy_forecast.git'
     targetRevision: HEAD
-    path: helm/energy-api # Путь к папке с Helm-чартом
+    path: helm/energy-api
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: default
   syncPolicy:
-    automated: # Включаем авто-синхронизацию
+    automated:
       prune: true
       selfHeal: true

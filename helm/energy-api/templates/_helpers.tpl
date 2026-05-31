@@ -60,3 +60,35 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create the MLflow component name.
+*/}}
+{{- define "energy-api.mlflowName" -}}
+{{- printf "%s-mlflow" (include "energy-api.name" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create the MLflow fully qualified name.
+*/}}
+{{- define "energy-api.mlflowFullname" -}}
+{{- printf "%s-mlflow" (include "energy-api.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+MLflow selector labels.
+*/}}
+{{- define "energy-api.mlflowSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "energy-api.mlflowName" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+MLflow common labels.
+*/}}
+{{- define "energy-api.mlflowLabels" -}}
+helm.sh/chart: {{ include "energy-api.chart" . }}
+{{ include "energy-api.mlflowSelectorLabels" . }}
+app.kubernetes.io/component: mlflow
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}

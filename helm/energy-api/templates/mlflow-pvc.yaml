@@ -1,0 +1,17 @@
+{{- if and .Values.mlflow.enabled .Values.mlflow.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "energy-api.mlflowFullname" . }}
+  labels:
+    {{- include "energy-api.mlflowLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mlflow.persistence.size }}
+  {{- with .Values.mlflow.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

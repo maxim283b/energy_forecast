@@ -8,7 +8,7 @@ MLOps-проект для прогноза цены электроэнергии
 - DVC для версионирования данных и воспроизводимого запуска пайплайна.
 - FastAPI-сервис с `/health`, `/predict` и `POST /v1/retrain`.
 - Docker Compose для локального запуска MLflow и API.
-- Helm-манифесты и ArgoCD-манифест для деплоя.
+- Helm chart для деплоя API и MLflow через ArgoCD.
 
 ## Последние результаты модели
 Последний сохранённый run в MLflow:
@@ -35,8 +35,7 @@ MLOps-проект для прогноза цены электроэнергии
 │   ├── models/          <- сохранённая модель
 │   └── predictions/     <- локальные результаты инференса
 ├── docs/                <- документация
-├── helm/energy-api/     <- Helm chart для API
-├── k8s/mlflow/          <- Kubernetes-манифест MLflow
+├── helm/energy-api/     <- Helm chart для API и MLflow
 ├── reports/figures/     <- графики обучения и визуализации
 ├── src/
 │   ├── data/            <- загрузка и очистка данных
@@ -127,6 +126,7 @@ Tracking URI:
 
 - локально: `http://localhost:5000`
 - внутри Docker Compose: `http://mlflow_server:5000`
+- внутри Kubernetes: `http://<release>-energy-api-mlflow:5000`
 
 Модель и метрики логируются в MLflow вручную из `src/models/train_optuna.py`:
 
@@ -157,8 +157,19 @@ python3 -m pytest tests -q
 python3 -m compileall app src tests test_infra.py test_environment.py
 ```
 
+## Deploy
+```bash
+helm upgrade --install energy-api helm/energy-api --namespace default
+kubectl apply -f argocd-api-app.yaml
+```
+
+Для Minikube:
+```bash
+minikube service energy-api --url
+minikube service energy-api-mlflow --url
+```
+
 ## Что не входит в текущую реализацию
 - web UI
 - автоматический drift monitoring
 - автоматический retrain по порогам drift/метрик
-
