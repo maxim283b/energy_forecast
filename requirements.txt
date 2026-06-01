@@ -8,9 +8,11 @@ xgboost
 pandas
 numpy
 scikit-learn
+optuna
 
 # MLOps & Tracking
-mlflow-skinny
+mlflow==2.11.3
+protobuf<5
 boto3
 python-dotenv
 

@@ -62,6 +62,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Если окружение уже использовалось раньше и в нем был другой `mlflow`, лучше сразу выровнять пакеты:
+
+```bash
+pip uninstall -y mlflow mlflow-skinny protobuf
+pip install -r requirements.txt
+```
+
 ### 2. Запуск MLflow
 ```bash
 docker compose up -d mlflow_server
