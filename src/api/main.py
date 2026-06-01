@@ -145,6 +145,13 @@ class RetrainResponse(BaseModel):
     force: bool
 
 
+def resolve_dataset_path(dataset: str) -> Path:
+    path = Path(dataset)
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return path.resolve()
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_loaded": MODEL_LOADED}
@@ -187,10 +194,34 @@ def retrain(request: RetrainRequest):
     if not TRAIN_SCRIPT.exists():
         raise HTTPException(status_code=404, detail="Training script not found")
 
+    dataset_path = resolve_dataset_path(request.dataset)
+    try:
+        dataset_path.relative_to(BASE_DIR)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Dataset must be inside project")
+
+    if not dataset_path.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    if MODEL_PATH.exists() and not request.force:
+        raise HTTPException(
+            status_code=409,
+            detail="Model already exists. Set force=true to retrain.",
+        )
+
     job_id = uuid.uuid4().hex
-    command = [sys.executable, str(TRAIN_SCRIPT)]
+    command = [
+        sys.executable,
+        str(TRAIN_SCRIPT),
+        "--dataset",
+        str(dataset_path),
+    ]
+    if request.force:
+        command.append("--force")
+
     env = os.environ.copy()
     env["MLFLOW_TRACKING_URI"] = DEFAULT_MLFLOW_TRACKING_URI
+    env["RETRAIN_DATASET"] = str(dataset_path)
 
     try:
         subprocess.Popen(
@@ -211,6 +242,6 @@ def retrain(request: RetrainRequest):
         job_id=job_id,
         command=" ".join(command),
         tracking_uri=DEFAULT_MLFLOW_TRACKING_URI,
-        dataset=request.dataset,
+        dataset=str(dataset_path.relative_to(BASE_DIR)),
         force=request.force,
     )

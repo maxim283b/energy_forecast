@@ -1,24 +1,50 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
+import mlflow
 import pandas as pd
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(BASE_DIR))
 
 from src.monitoring.config import (  # noqa: E402
+    MLFLOW_EXPERIMENT,
+    MLFLOW_TRACKING_URI,
     PREDICTIONS_PATH,
     REPORTS_DIR,
     RETRAIN_API_URL,
     RETRAIN_DATASET,
     TRIGGER_STATUS_PATH,
 )
+
+
+def load_trigger_status() -> dict | None:
+    if not TRIGGER_STATUS_PATH.exists():
+        return None
+    return json.loads(TRIGGER_STATUS_PATH.read_text(encoding="utf-8"))
+
+
+def render_drift_notifications() -> None:
+    status = load_trigger_status()
+    if status is None:
+        st.info("Drift status is not available yet.")
+        return
+
+    checked_at = status.get("checked_at", "n/a")
+    if status.get("should_retrain"):
+        st.error(f"Drift alert. Retrain is recommended. Checked at: {checked_at}")
+        for reason in status.get("reasons", []):
+            st.warning(reason)
+    else:
+        st.success(f"No active drift alert. Checked at: {checked_at}")
 
 
 def render_report(report_name: str, title: str) -> None:
@@ -49,11 +75,11 @@ def render_predictions() -> None:
 
 def render_trigger_status() -> None:
     st.subheader("Retrain Trigger Status")
-    if not TRIGGER_STATUS_PATH.exists():
+    status = load_trigger_status()
+    if status is None:
         st.info("Trigger status not available yet. Generate drift reports first.")
         return
 
-    status = json.loads(TRIGGER_STATUS_PATH.read_text(encoding="utf-8"))
     if status.get("should_retrain"):
         st.error("Retrain recommended")
         for reason in status.get("reasons", []):
@@ -81,13 +107,61 @@ def call_retrain_api() -> None:
         )
 
 
+def render_experiments() -> None:
+    st.subheader("MLflow Experiments")
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+    try:
+        experiment = mlflow.get_experiment_by_name(MLFLOW_EXPERIMENT)
+        if experiment is None:
+            st.info(f"Experiment not found: {MLFLOW_EXPERIMENT}")
+            return
+
+        runs = mlflow.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            order_by=["start_time DESC"],
+            max_results=20,
+        )
+    except Exception as exc:
+        st.error(f"MLflow is not available: {exc}")
+        st.caption(f"Tracking URI: {MLFLOW_TRACKING_URI}")
+        return
+
+    st.caption(f"Tracking URI: {MLFLOW_TRACKING_URI}")
+    st.caption(f"Experiment: {MLFLOW_EXPERIMENT}")
+
+    if runs.empty:
+        st.info("No runs found.")
+        return
+
+    preferred_columns = [
+        "run_id",
+        "status",
+        "start_time",
+        "metrics.mae",
+        "metrics.rmse",
+        "metrics.r2",
+        "params.dataset",
+        "params.force_retrain",
+    ]
+    visible_columns = [col for col in preferred_columns if col in runs.columns]
+    st.dataframe(runs[visible_columns], use_container_width=True)
+
+
 def main() -> None:
     st.set_page_config(page_title="Energy Forecast UI", layout="wide")
     st.title("Energy Forecast Dashboard")
     st.caption("Inference, drift monitoring, model quality, and retraining")
 
-    tab_predictions, tab_drift, tab_quality = st.tabs(
-        ["Inference & History", "Data & Target Drift", "Model Quality"]
+    render_drift_notifications()
+
+    tab_predictions, tab_drift, tab_quality, tab_experiments = st.tabs(
+        [
+            "Inference & History",
+            "Data & Target Drift",
+            "Model Quality",
+            "Experiments",
+        ]
     )
 
     with tab_predictions:
@@ -106,6 +180,14 @@ def main() -> None:
         if st.button("Start Retraining"):
             call_retrain_api()
 
+    with tab_experiments:
+        render_experiments()
+
 
 if __name__ == "__main__":
+    if get_script_run_ctx() is None:
+        os.execv(
+            sys.executable,
+            [sys.executable, "-m", "streamlit", "run", str(Path(__file__).resolve())],
+        )
     main()

@@ -7,7 +7,8 @@ MLOps-проект для прогноза цены электроэнергии
 - MLflow для трекинга экспериментов, метрик, модели и drift-отчётов.
 - DVC для версионирования данных и воспроизводимого запуска пайплайна.
 - FastAPI-сервис с `/health`, `/metrics`, `/predict` и `POST /v1/retrain`.
-- Streamlit UI для прогнозов, drift-отчётов, качества модели и ручного retrain.
+- Streamlit UI для прогнозов, drift-отчётов, качества модели, MLflow experiments,
+  drift-уведомлений и ручного retrain.
 - Prometheus и Grafana для runtime-метрик API.
 - Docker Compose для локального запуска MLflow, API, UI и мониторинга.
 - Helm chart для деплоя API и MLflow через ArgoCD.
@@ -159,6 +160,9 @@ Drift-отчёты сохраняются в:
 - `reports/drift/regression_quality.html`
 - `reports/drift/retrain_trigger.json`
 
+UI показывает drift-уведомление на главной странице по состоянию
+`reports/drift/retrain_trigger.json`.
+
 Автоматический retrain по порогам:
 
 ```bash
@@ -183,6 +187,9 @@ Tracking URI:
 - params
 - metrics
 - model artifact
+
+В Streamlit UI есть вкладка `Experiments`, которая читает последние runs из
+MLflow experiment `Energy_Forecast_Final`.
 
 ## DVC
 Текущий remote:

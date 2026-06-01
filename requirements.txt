@@ -26,6 +26,7 @@ streamlit==1.39.0
 prometheus-client
 
 # Utilities
+setuptools<81
 httpx
 requests
 pydantic

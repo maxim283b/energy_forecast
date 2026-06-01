@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -24,13 +25,35 @@ except ImportError:
     )
 
 # Конфигурация
-DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
+DEFAULT_DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
 MODEL_SAVE_PATH = BASE_DIR / "models/model.json"
 REPORTS_DIR = BASE_DIR / "reports/figures"
 OFFSET = 50  # Смещение для работы с отрицательными ценами
 
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 mlflow.set_experiment("Energy_Forecast_Final")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train energy forecast model.")
+    parser.add_argument(
+        "--dataset",
+        default=os.getenv("RETRAIN_DATASET", str(DEFAULT_DATA_PATH)),
+        help="Path to processed training dataset.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing model artifact.",
+    )
+    return parser.parse_args()
+
+
+def resolve_dataset_path(dataset: str) -> Path:
+    path = Path(dataset)
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return path.resolve()
 
 
 def objective(trial, X, y):
@@ -72,12 +95,15 @@ def objective(trial, X, y):
 
 
 def main():
+    args = parse_args()
+    data_path = resolve_dataset_path(args.dataset)
+
     # 1. Загрузка и подготовка
-    if not DATA_PATH.exists():
-        print(f"Ошибка: Файл {DATA_PATH} не найден!")
+    if not data_path.exists():
+        print(f"Ошибка: Файл {data_path} не найден!")
         return
 
-    df = pd.read_csv(DATA_PATH).sort_values("timestamp")
+    df = pd.read_csv(data_path).sort_values("timestamp")
     X = df.drop(columns=["timestamp", "target"])
     if "price" in X.columns:
         X = X.drop(columns=["price"])
@@ -115,6 +141,8 @@ def main():
         rmse = np.sqrt(mean_squared_error(y_test, y_pred_final))
 
         # Логируем в MLflow
+        mlflow.log_param("dataset", str(data_path))
+        mlflow.log_param("force_retrain", args.force)
         mlflow.log_params(study.best_params)
         mlflow.log_metrics({"mae": mae, "r2": r2, "rmse": rmse})
         mlflow.xgboost.log_model(best_model, "model")

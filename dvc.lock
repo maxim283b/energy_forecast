@@ -54,8 +54,8 @@ stages:
       size: 7401507
     - path: src/models/train_optuna.py
       hash: md5
-      md5: 5b03aa7ee66b31fb456cee2833e2171d
-      size: 5403
+      md5: b3a3b2f35597f536dc935df792cc5369
+      size: 6211
     - path: src/visualization/visualize.py
       hash: md5
       md5: bd0d9a0ad41208ce81969094da25127e
@@ -63,8 +63,8 @@ stages:
     outs:
     - path: models/model.json
       hash: md5
-      md5: 398cff9e956bbf41a2401a76882befc3
-      size: 3277578
+      md5: ca0995442582c0e0eb05b0e8f9b99a68
+      size: 3384056
   predict:
     cmd: python3 src/models/predict_model.py
     deps:
@@ -74,8 +74,8 @@ stages:
       size: 7401507
     - path: models/model.json
       hash: md5
-      md5: 398cff9e956bbf41a2401a76882befc3
-      size: 3277578
+      md5: ca0995442582c0e0eb05b0e8f9b99a68
+      size: 3384056
     - path: src/models/predict_model.py
       hash: md5
       md5: dd38ae363da91abe07852fedb8e2640f
@@ -98,8 +98,8 @@ stages:
       size: 7401507
     - path: models/model.json
       hash: md5
-      md5: 398cff9e956bbf41a2401a76882befc3
-      size: 3277578
+      md5: ca0995442582c0e0eb05b0e8f9b99a68
+      size: 3384056
     - path: src/monitoring/config.py
       hash: md5
       md5: 0fcf04f0f84728cee98029f7d6638b25

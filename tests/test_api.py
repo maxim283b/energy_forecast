@@ -87,3 +87,21 @@ def test_retrain_endpoint_starts_job(monkeypatch):
     assert payload["force"] is True
     assert payload["tracking_uri"] == "http://localhost:5000"
     assert calls
+    command = calls[0]["args"][0]
+    assert "--dataset" in command
+    assert "--force" in command
+    assert command[-1] == "--force"
+
+
+def test_retrain_endpoint_requires_force_for_existing_model(monkeypatch, tmp_path):
+    existing_model = tmp_path / "model.json"
+    existing_model.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(main_module, "MODEL_PATH", existing_model)
+
+    response = client.post(
+        "/v1/retrain",
+        json={"dataset": "data/processed/energy_ready.csv", "force": False},
+    )
+
+    assert response.status_code == 409
+    assert "force=true" in response.json()["detail"]
