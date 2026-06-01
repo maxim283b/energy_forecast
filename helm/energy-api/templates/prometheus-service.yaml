@@ -1,0 +1,22 @@
+{{- if .Values.prometheus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "energy-api.fullname" . }}-prometheus
+  labels:
+    {{- include "energy-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  type: {{ .Values.prometheus.service.type }}
+  ports:
+    - port: {{ .Values.prometheus.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if and (eq .Values.prometheus.service.type "NodePort") .Values.prometheus.service.nodePort }}
+      nodePort: {{ .Values.prometheus.service.nodePort }}
+      {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ include "energy-api.name" . }}-prometheus
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

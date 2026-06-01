@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, 'infra/**' ]
+    branches: [ main, develop, 'infra/**' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 permissions:
   contents: write
@@ -61,20 +61,20 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
           tags: |
             ghcr.io/${{ github.repository }}/energy-api:latest
             ghcr.io/${{ github.repository }}/energy-api:${{ github.sha }}
 
       - name: Update Helm image tag
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           perl -0pi -e 's/(^image:\n(?:  .+\n)*?  tag: ")[^"]+(")/$1$ENV{IMAGE_TAG}$2/m' helm/energy-api/values.yaml
 
       - name: Commit Helm image tag
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           if git diff --quiet -- helm/energy-api/values.yaml; then
             echo "Helm image tag is already up to date"

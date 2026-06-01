@@ -3,11 +3,13 @@ MLOps-проект для прогноза цены электроэнергии
 
 ## Что уже есть
 - Python 3.11.
-- Пайплайн данных: `ingest -> clean -> featurize -> train`.
-- MLflow для трекинга экспериментов, метрик и модели.
+- Пайплайн данных: `ingest -> clean -> featurize -> train -> predict -> monitor`.
+- MLflow для трекинга экспериментов, метрик, модели и drift-отчётов.
 - DVC для версионирования данных и воспроизводимого запуска пайплайна.
-- FastAPI-сервис с `/health`, `/predict` и `POST /v1/retrain`.
-- Docker Compose для локального запуска MLflow и API.
+- FastAPI-сервис с `/health`, `/metrics`, `/predict` и `POST /v1/retrain`.
+- Streamlit UI для прогнозов, drift-отчётов, качества модели и ручного retrain.
+- Prometheus и Grafana для runtime-метрик API.
+- Docker Compose для локального запуска MLflow, API, UI и мониторинга.
 - Helm chart для деплоя API и MLflow через ArgoCD.
 
 ## Последние результаты модели
@@ -36,11 +38,15 @@ MLOps-проект для прогноза цены электроэнергии
 ├── helm/                <- Helm chart и ArgoCD manifest
 ├── models/              <- сериализованные модели
 ├── reports/figures/     <- графики обучения и визуализации
+├── reports/drift/       <- Evidently drift-отчёты
+├── monitoring/          <- Prometheus и Grafana provisioning
 ├── src/
 │   ├── api/             <- FastAPI приложение
 │   ├── data/            <- загрузка и очистка данных
 │   ├── features/        <- генерация признаков
+│   ├── monitoring/      <- drift reports и retrain trigger
 │   ├── models/          <- обучение и локальный инференс
+│   ├── ui/              <- Streamlit dashboard
 │   └── visualization/   <- графики и отчёты
 ├── tests/               <- API-тесты
 ├── dvc.yaml             <- DVC pipeline
@@ -69,16 +75,21 @@ pip uninstall -y mlflow mlflow-skinny protobuf
 pip install -r requirements.txt
 ```
 
-### 2. Запуск MLflow
+### 2. Запуск локальной инфраструктуры
 ```bash
-docker compose up -d mlflow_server
+docker compose up -d mlflow_server energy_api streamlit_ui prometheus grafana
 ```
 
-MLflow доступен по адресу:
+Локальные адреса:
 
-- `http://localhost:5000`
+- API: `http://localhost:8080`
+- API metrics: `http://localhost:8080/metrics`
+- MLflow: `http://localhost:5000`
+- Streamlit UI: `http://localhost:8501`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (`admin` / `admin`)
 
-### 3. Запуск API локально
+### 3. Запуск API без Docker
 ```bash
 python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8001
 ```
@@ -86,6 +97,11 @@ python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8001
 Проверка health:
 ```bash
 curl http://127.0.0.1:8001/health
+```
+
+Проверка Prometheus metrics:
+```bash
+curl http://127.0.0.1:8001/metrics
 ```
 
 ### 4. Запуск всего пайплайна
@@ -99,6 +115,8 @@ dvc repro
 - `clean`
 - `featurize`
 - `train`
+- `predict`
+- `monitor`
 
 ### 5. Переобучение через API
 ```bash
@@ -128,6 +146,31 @@ python src/models/predict_model.py
 
 - `data/predictions/latest_forecast.csv`
 
+### 7. Drift monitoring и UI
+```bash
+python src/monitoring/generate_reports.py
+streamlit run src/ui/app.py
+```
+
+Drift-отчёты сохраняются в:
+
+- `reports/drift/data_drift.html`
+- `reports/drift/target_drift.html`
+- `reports/drift/regression_quality.html`
+- `reports/drift/retrain_trigger.json`
+
+Автоматический retrain по порогам:
+
+```bash
+AUTO_RETRAIN=true python src/monitoring/generate_reports.py
+```
+
+Плановый запуск:
+
+```bash
+0 2 * * * /path/to/energy_forecast/scripts/run_drift_monitor.sh >> /path/to/energy_forecast/reports/drift/cron.log 2>&1
+```
+
 ## MLflow
 Tracking URI:
 
@@ -155,13 +198,14 @@ Tracking URI:
 
 ## Эндпоинты
 - `GET /health`
+- `GET /metrics`
 - `POST /predict`
 - `POST /v1/retrain`
 
 ## Проверка качества
 ```bash
 python3 -m pytest tests -q
-python3 -m compileall app src tests test_infra.py test_environment.py
+python3 -m compileall src tests test_infra.py test_environment.py
 ```
 
 ## Deploy
@@ -176,7 +220,8 @@ minikube service energy-api --url
 minikube service energy-api-mlflow --url
 ```
 
-## Что не входит в текущую реализацию
-- web UI
-- автоматический drift monitoring
-- автоматический retrain по порогам drift/метрик
+## Мониторинг
+- Evidently генерирует data drift, target drift и regression quality отчёты.
+- PSI и деградация MAE/R2 формируют `reports/drift/retrain_trigger.json`.
+- Prometheus собирает `/metrics` FastAPI.
+- Grafana автоматически подхватывает dashboard `Energy Forecast Monitoring`.

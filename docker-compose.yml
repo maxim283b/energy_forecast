@@ -1,5 +1,4 @@
 services:
-  # Сервис трекинга экспериментов
   mlflow_server:
     image: ghcr.io/mlflow/mlflow:v2.11.3
     container_name: mlflow_server_energy
@@ -26,4 +25,50 @@ services:
       - MLFLOW_TRACKING_URI=http://mlflow_server:5000
     volumes:
       - ./models:/app/models  # Позволяет обновлять модель без пересборки контейнера
+    restart: always
+
+  streamlit_ui:
+    build: .
+    container_name: energy_streamlit_ui
+    depends_on:
+      - energy_api
+    ports:
+      - "8501:8501"
+    environment:
+      - RETRAIN_API_URL=http://energy_api:8000/v1/retrain
+      - MLFLOW_TRACKING_URI=http://mlflow_server:5000
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports
+    command: >
+      streamlit run src/ui/app.py
+      --server.address 0.0.0.0
+      --server.port 8501
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: energy_prometheus
+    depends_on:
+      - energy_api
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: always
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: energy_grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     restart: always
