@@ -1,0 +1,52 @@
+{{- if .Values.mlflow.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "energy-api.mlflowFullname" . }}
+  labels:
+    {{- include "energy-api.mlflowLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mlflow.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "energy-api.mlflowSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "energy-api.mlflowLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: mlflow
+          image: "{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
+          imagePullPolicy: {{ .Values.mlflow.image.pullPolicy }}
+          command:
+            - mlflow
+            - server
+            - --host
+            - 0.0.0.0
+            - --port
+            - {{ .Values.mlflow.service.port | quote }}
+            - --backend-store-uri
+            - {{ .Values.mlflow.backendStoreUri | quote }}
+            - --default-artifact-root
+            - {{ .Values.mlflow.defaultArtifactRoot | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.mlflow.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: mlflow-data
+              mountPath: {{ .Values.mlflow.persistence.mountPath }}
+          {{- with .Values.mlflow.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: mlflow-data
+          {{- if .Values.mlflow.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "energy-api.mlflowFullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

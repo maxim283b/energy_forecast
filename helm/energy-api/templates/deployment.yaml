@@ -40,6 +40,13 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: MLFLOW_TRACKING_URI
+              {{- if and .Values.mlflow.enabled (not .Values.env.MLFLOW_TRACKING_URI) }}
+              value: {{ printf "http://%s:%v" (include "energy-api.mlflowFullname" .) .Values.mlflow.service.port | quote }}
+              {{- else }}
+              value: {{ default "http://localhost:5000" .Values.env.MLFLOW_TRACKING_URI | quote }}
+              {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

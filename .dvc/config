@@ -1,7 +1,8 @@
 [core]
     remote = storage
+    site_cache_dir = .dvc/tmp/site-cache
 ['remote "local_remote"']
     url = /tmp/dvc_storage
 ['remote "storage"']
-    url = gdrive://1rmKFGnxc7_v241n82OFcuic9ZZGzs9Tq
+    url = gdrive://1cQPF0AXQ5FrwZTMjFsoFMbn0qnjGxSDR/dvcstore
     gdrive_acknowledge_abuse = true

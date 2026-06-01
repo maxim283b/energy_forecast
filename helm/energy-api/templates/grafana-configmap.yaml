@@ -1,0 +1,33 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "energy-api.fullname" . }}-grafana-config
+  labels:
+    {{- include "energy-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://{{ include "energy-api.fullname" . }}-prometheus:{{ .Values.prometheus.service.port }}
+        isDefault: true
+        editable: true
+  dashboards.yml: |
+    apiVersion: 1
+    providers:
+      - name: Energy Forecast
+        orgId: 1
+        folder: Energy Forecast
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+  energy_forecast.json: |
+{{ .Files.Get "dashboards/energy_forecast.json" | indent 4 }}
+{{- end }}
