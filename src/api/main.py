@@ -2,7 +2,9 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -62,7 +64,9 @@ MODEL_LOADED = False
 BASE_DIR = Path(__file__).resolve().parents[2]
 MODEL_PATH = BASE_DIR / "models" / "model.json"
 TRAIN_SCRIPT = BASE_DIR / "src" / "models" / "train_optuna.py"
+RETRAIN_LOG_DIR = BASE_DIR / "reports" / "retrain"
 DEFAULT_MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+RETRAIN_JOBS: dict[str, dict] = {}
 
 PREDICTION_REQUESTS = Counter(
     "energy_prediction_requests_total",
@@ -71,6 +75,10 @@ PREDICTION_REQUESTS = Counter(
 PREDICTION_ERRORS = Counter(
     "energy_prediction_errors_total",
     "Total failed prediction requests.",
+)
+PREDICTION_ANOMALIES = Counter(
+    "energy_prediction_anomalies_total",
+    "Total predictions flagged as business anomalies.",
 )
 PREDICTION_LATENCY = Histogram(
     "energy_prediction_latency_seconds",
@@ -85,20 +93,33 @@ MODEL_LOADED_GAUGE = Gauge(
     "Model loaded status: 1 loaded, 0 missing or failed.",
 )
 
-# Загружаем модель
 model = xgb.XGBRegressor()
-if MODEL_PATH.exists():
+
+
+def reload_model() -> bool:
+    global MODEL_LOADED, model
+
+    model = xgb.XGBRegressor()
+    if not MODEL_PATH.exists():
+        MODEL_LOADED = False
+        MODEL_LOADED_GAUGE.set(0)
+        logger.warning("Model file not found!")
+        return False
+
     try:
         model.load_model(str(MODEL_PATH))
         MODEL_LOADED = True
         MODEL_LOADED_GAUGE.set(1)
         logger.info(f"Model loaded successfully from {MODEL_PATH}")
+        return True
     except Exception as e:
+        MODEL_LOADED = False
         MODEL_LOADED_GAUGE.set(0)
         logger.error(f"Failed to load model: {e}")
-else:
-    MODEL_LOADED_GAUGE.set(0)
-    logger.warning("Model file not found!")
+        return False
+
+
+reload_model()
 
 
 # Схема данных (все те фичи, которые требовал XGBoost)
@@ -145,11 +166,38 @@ class RetrainResponse(BaseModel):
     force: bool
 
 
+class RetrainStatus(BaseModel):
+    status: str
+    job_id: str
+    dataset: str
+    force: bool
+    started_at: str
+    finished_at: str | None = None
+    return_code: int | None = None
+    log_path: str | None = None
+    model_reloaded: bool = False
+
+
 def resolve_dataset_path(dataset: str) -> Path:
     path = Path(dataset)
     if not path.is_absolute():
         path = BASE_DIR / path
     return path.resolve()
+
+
+def _watch_retrain_job(job_id: str, process: subprocess.Popen, log_file) -> None:
+    return_code = process.wait()
+    log_file.close()
+
+    job = RETRAIN_JOBS[job_id]
+    job["return_code"] = return_code
+    job["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+    if return_code == 0:
+        job["model_reloaded"] = reload_model()
+        job["status"] = "succeeded" if job["model_reloaded"] else "reload_failed"
+    else:
+        job["status"] = "failed"
 
 
 @app.get("/health")
@@ -160,6 +208,14 @@ def health():
 @app.get("/metrics")
 def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.post("/v1/model/reload")
+def reload_model_endpoint():
+    loaded = reload_model()
+    if not loaded:
+        raise HTTPException(status_code=500, detail="Model reload failed")
+    return {"status": "reloaded", "model_loaded": MODEL_LOADED}
 
 
 @app.post("/predict")
@@ -179,7 +235,10 @@ def predict(input_data: PredictionInput):
 
         predicted_price = float(final_price[0])
         LAST_PREDICTED_PRICE.set(predicted_price)
-        return {"predicted_price": predicted_price}
+        anomaly_flag = predicted_price < 0 or predicted_price > 200
+        if anomaly_flag:
+            PREDICTION_ANOMALIES.inc()
+        return {"predicted_price": predicted_price, "anomaly_flag": anomaly_flag}
 
     except Exception as e:
         PREDICTION_ERRORS.inc()
@@ -210,6 +269,8 @@ def retrain(request: RetrainRequest):
         )
 
     job_id = uuid.uuid4().hex
+    RETRAIN_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = RETRAIN_LOG_DIR / f"{job_id}.log"
     command = [
         sys.executable,
         str(TRAIN_SCRIPT),
@@ -222,20 +283,42 @@ def retrain(request: RetrainRequest):
     env = os.environ.copy()
     env["MLFLOW_TRACKING_URI"] = DEFAULT_MLFLOW_TRACKING_URI
     env["RETRAIN_DATASET"] = str(dataset_path)
+    env.setdefault("MLFLOW_REGISTERED_MODEL_NAME", "EnergyForecastXGBoost")
 
     try:
-        subprocess.Popen(
+        log_file = log_path.open("w", encoding="utf-8")
+        process = subprocess.Popen(
             command,
             cwd=str(BASE_DIR),
             env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
         )
     except Exception as e:
         logger.error(f"Retrain start error: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to start retrain: {str(e)}"
         )
+
+    RETRAIN_JOBS[job_id] = {
+        "status": "running",
+        "job_id": job_id,
+        "dataset": str(dataset_path.relative_to(BASE_DIR)),
+        "force": request.force,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": None,
+        "return_code": None,
+        "log_path": str(log_path.relative_to(BASE_DIR)),
+        "model_reloaded": False,
+    }
+    if hasattr(process, "wait"):
+        threading.Thread(
+            target=_watch_retrain_job,
+            args=(job_id, process, log_file),
+            daemon=True,
+        ).start()
+    else:  # pragma: no cover - used by lightweight test doubles
+        log_file.close()
 
     return RetrainResponse(
         status="started",
@@ -245,3 +328,11 @@ def retrain(request: RetrainRequest):
         dataset=str(dataset_path.relative_to(BASE_DIR)),
         force=request.force,
     )
+
+
+@app.get("/v1/retrain/{job_id}", response_model=RetrainStatus)
+def retrain_status(job_id: str):
+    job = RETRAIN_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Retrain job not found")
+    return RetrainStatus(**job)

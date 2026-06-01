@@ -54,8 +54,8 @@ stages:
       size: 7401507
     - path: src/models/train_optuna.py
       hash: md5
-      md5: b3a3b2f35597f536dc935df792cc5369
-      size: 6211
+      md5: 8b6678bb43d848a800445ca136d7a675
+      size: 6419
     - path: src/visualization/visualize.py
       hash: md5
       md5: bd0d9a0ad41208ce81969094da25127e
@@ -78,8 +78,8 @@ stages:
       size: 3384056
     - path: src/models/predict_model.py
       hash: md5
-      md5: dd38ae363da91abe07852fedb8e2640f
-      size: 3006
+      md5: b9c92a2a9413355b6b34fe5b3d15fef4
+      size: 3226
     outs:
     - path: data/predictions/latest_forecast.csv
       hash: md5

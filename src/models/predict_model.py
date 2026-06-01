@@ -9,6 +9,7 @@ import xgboost as xgb
 BASE_DIR = Path(__file__).resolve().parents[2]
 MODEL_PATH = BASE_DIR / "models/model.json"
 DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
+OFFSET = 50
 
 
 def predict_local(data):
@@ -35,8 +36,9 @@ def predict_local(data):
     # 4. Выстраиваем колонки в СТРОГОМ порядке, как ждет XGBoost
     X = data[model_features].astype(np.float64)
 
-    # 5. Прогноз
-    preds = model.predict(X)
+    # 5. Прогноз в исходной шкале цены
+    preds_log = model.predict(X)
+    preds = np.expm1(preds_log) - OFFSET
     return preds
 
 
@@ -62,6 +64,9 @@ def main():
         print("\n--- Результаты прогноза (последние 5 часов) ---")
         output = pd.DataFrame(
             {"timestamp": sample_data["timestamp"].values, "predicted_price": results}
+        )
+        output["anomaly_flag"] = (output["predicted_price"] < 0) | (
+            output["predicted_price"] > 200
         )
         print(output.to_string(index=False))
 

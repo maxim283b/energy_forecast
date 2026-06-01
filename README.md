@@ -4,9 +4,10 @@ MLOps-проект для прогноза цены электроэнергии
 ## Что уже есть
 - Python 3.11.
 - Пайплайн данных: `ingest -> clean -> featurize -> train -> predict -> monitor`.
-- MLflow для трекинга экспериментов, метрик, модели и drift-отчётов.
+- MLflow для трекинга экспериментов, метрик, регистрации модели и drift-отчётов.
 - DVC для версионирования данных и воспроизводимого запуска пайплайна.
-- FastAPI-сервис с `/health`, `/metrics`, `/predict` и `POST /v1/retrain`.
+- FastAPI-сервис с `/health`, `/metrics`, `/predict`, `POST /v1/retrain`,
+  `GET /v1/retrain/{job_id}` и `POST /v1/model/reload`.
 - Streamlit UI для прогнозов, drift-отчётов, качества модели, MLflow experiments,
   drift-уведомлений и ручного retrain.
 - Prometheus и Grafana для runtime-метрик API.
@@ -138,6 +139,17 @@ curl -X POST http://127.0.0.1:8001/v1/retrain \
 }
 ```
 
+Статус фонового переобучения:
+```bash
+curl http://127.0.0.1:8001/v1/retrain/<job_id>
+```
+
+После успешного retrain API автоматически перечитывает `models/model.json`.
+Ручной reload модели:
+```bash
+curl -X POST http://127.0.0.1:8001/v1/model/reload
+```
+
 ### 6. Локальный инференс
 ```bash
 python src/models/predict_model.py
@@ -187,6 +199,7 @@ Tracking URI:
 - params
 - metrics
 - model artifact
+- registered model `EnergyForecastXGBoost`
 
 В Streamlit UI есть вкладка `Experiments`, которая читает последние runs из
 MLflow experiment `Energy_Forecast_Final`.
@@ -207,7 +220,9 @@ MLflow experiment `Energy_Forecast_Final`.
 - `GET /health`
 - `GET /metrics`
 - `POST /predict`
+- `POST /v1/model/reload`
 - `POST /v1/retrain`
+- `GET /v1/retrain/{job_id}`
 
 ## Проверка качества
 ```bash
@@ -216,6 +231,13 @@ python3 -m compileall src tests test_infra.py test_environment.py
 ```
 
 ## Deploy
+Production-like GitOps flow:
+
+- Pull Request в `main` запускает lint, tests, Docker build без push и Helm
+  validation.
+- Merge/push в `main` публикует Docker image в GHCR и обновляет Helm image tag.
+- ArgoCD читает `main` и синхронизирует Helm chart в Kubernetes.
+
 ```bash
 helm upgrade --install energy-api helm/energy-api --namespace default
 kubectl apply -f helm/argocd-api-app.yaml
@@ -223,6 +245,9 @@ kubectl apply -f helm/argocd-api-app.yaml
 
 Для Minikube:
 ```bash
+eval $(minikube docker-env)
+docker build -t energy-api:local .
+kubectl apply -f helm/argocd-api-app-minikube.yaml
 minikube service energy-api --url
 minikube service energy-api-mlflow --url
 ```
@@ -230,5 +255,6 @@ minikube service energy-api-mlflow --url
 ## Мониторинг
 - Evidently генерирует data drift, target drift и regression quality отчёты.
 - PSI и деградация MAE/R2 формируют `reports/drift/retrain_trigger.json`.
-- Prometheus собирает `/metrics` FastAPI.
+- Prometheus собирает `/metrics` FastAPI: request count, latency, errors,
+  model loaded status, last predicted price и anomaly count.
 - Grafana автоматически подхватывает dashboard `Energy Forecast Monitoring`.

@@ -38,6 +38,14 @@ jobs:
       - name: Run tests
         run: pytest tests/
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate Helm chart
+        run: |
+          helm lint helm/energy-api
+          helm template energy-api helm/energy-api
+
   build-and-push-docker:
     needs: lint-and-test
     runs-on: ubuntu-latest
@@ -50,7 +58,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to GitHub Container Registry
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -61,20 +69,20 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/${{ github.repository }}/energy-api:latest
             ghcr.io/${{ github.repository }}/energy-api:${{ github.sha }}
 
       - name: Update Helm image tag
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           perl -0pi -e 's/(^image:\n(?:  .+\n)*?  tag: ")[^"]+(")/$1$ENV{IMAGE_TAG}$2/m' helm/energy-api/values.yaml
 
       - name: Commit Helm image tag
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           if git diff --quiet -- helm/energy-api/values.yaml; then
             echo "Helm image tag is already up to date"

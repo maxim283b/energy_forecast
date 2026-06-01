@@ -62,7 +62,9 @@ def test_prediction_endpoint():
     assert response.status_code in [200, 500]
 
     if response.status_code == 200:
-        assert "predicted_price" in response.json()
+        payload = response.json()
+        assert "predicted_price" in payload
+        assert "anomaly_flag" in payload
 
 
 def test_retrain_endpoint_starts_job(monkeypatch):
@@ -86,11 +88,16 @@ def test_retrain_endpoint_starts_job(monkeypatch):
     assert payload["dataset"] == "data/processed/energy_ready.csv"
     assert payload["force"] is True
     assert payload["tracking_uri"] == "http://localhost:5000"
+    assert payload["job_id"] in main_module.RETRAIN_JOBS
     assert calls
     command = calls[0]["args"][0]
     assert "--dataset" in command
     assert "--force" in command
     assert command[-1] == "--force"
+
+    status_response = client.get(f"/v1/retrain/{payload['job_id']}")
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "running"
 
 
 def test_retrain_endpoint_requires_force_for_existing_model(monkeypatch, tmp_path):

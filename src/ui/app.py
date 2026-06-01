@@ -64,6 +64,11 @@ def render_predictions() -> None:
         return
 
     predictions = pd.read_csv(PREDICTIONS_PATH)
+    if "predicted_price" in predictions.columns and "anomaly_flag" not in predictions:
+        predictions["anomaly_flag"] = (predictions["predicted_price"] < 0) | (
+            predictions["predicted_price"] > 200
+        )
+
     st.dataframe(predictions, use_container_width=True)
 
     if {"timestamp", "predicted_price"}.issubset(predictions.columns):

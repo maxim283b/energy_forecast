@@ -18,6 +18,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
 # Важно: Docker должен видеть папку src и data
 COPY src/ ./src/
 COPY data/ ./data/
+COPY models/ ./models/
 
 # Открываем порт для FastAPI
 EXPOSE 8000

@@ -32,6 +32,10 @@ OFFSET = 50  # Смещение для работы с отрицательны�
 
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 mlflow.set_experiment("Energy_Forecast_Final")
+MLFLOW_REGISTERED_MODEL_NAME = os.getenv(
+    "MLFLOW_REGISTERED_MODEL_NAME",
+    "EnergyForecastXGBoost",
+)
 
 
 def parse_args():
@@ -145,7 +149,11 @@ def main():
         mlflow.log_param("force_retrain", args.force)
         mlflow.log_params(study.best_params)
         mlflow.log_metrics({"mae": mae, "r2": r2, "rmse": rmse})
-        mlflow.xgboost.log_model(best_model, "model")
+        mlflow.xgboost.log_model(
+            best_model,
+            "model",
+            registered_model_name=MLFLOW_REGISTERED_MODEL_NAME,
+        )
 
         # 6. Сохранение и Визуализация
         MODEL_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
