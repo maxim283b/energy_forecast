@@ -118,3 +118,7 @@ models/mlflow_model/
 
 # Plots (если хочешь хранить их только в MLflow)
 data/plots/*.png
+
+# Drift reports are generated locally and logged to MLflow.
+reports/drift/*
+!reports/drift/.gitkeep

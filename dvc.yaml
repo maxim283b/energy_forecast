@@ -1,29 +1,49 @@
 stages:
   ingest:
-    cmd: python src/data/data_loader.py
+    cmd: python3 src/data/data_loader.py
     deps:
     - src/data/data_loader.py
     outs:
     - data/raw/big_energy_dataset_v2.csv
   clean:
-    cmd: python src/data/make_dataset.py data/raw/big_energy_dataset_v2.csv data/interim/energy_cleaned.csv
+    cmd: python3 src/data/make_dataset.py data/raw/big_energy_dataset_v2.csv data/interim/energy_cleaned.csv
     deps:
     - src/data/make_dataset.py
     - data/raw/big_energy_dataset_v2.csv
     outs:
     - data/interim/energy_cleaned.csv
   featurize:
-    cmd: python src/features/build_features.py
+    cmd: python3 src/features/build_features.py
     deps:
     - src/features/build_features.py
     - data/interim/energy_cleaned.csv
     outs:
     - data/processed/energy_ready.csv
   train:
-    cmd: python src/models/train_optuna.py
+    cmd: python3 src/models/train_optuna.py
     deps:
     - src/models/train_optuna.py
     - src/visualization/visualize.py
     - data/processed/energy_ready.csv
     outs:
     - models/model.json
+  predict:
+    cmd: python3 src/models/predict_model.py
+    deps:
+    - src/models/predict_model.py
+    - models/model.json
+    - data/processed/energy_ready.csv
+    outs:
+    - data/predictions/latest_forecast.csv
+  monitor:
+    cmd: python3 src/monitoring/generate_reports.py
+    deps:
+    - src/monitoring/config.py
+    - src/monitoring/generate_reports.py
+    - src/monitoring/metrics.py
+    - models/model.json
+    - data/processed/energy_ready.csv
+    - data/predictions/latest_forecast.csv
+    outs:
+    - reports/drift:
+        persist: true

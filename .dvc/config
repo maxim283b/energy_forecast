@@ -1,5 +1,6 @@
 [core]
     remote = storage
+    site_cache_dir = .dvc/tmp/site-cache
 ['remote "local_remote"']
     url = /tmp/dvc_storage
 ['remote "storage"']
