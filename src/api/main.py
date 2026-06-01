@@ -10,6 +10,47 @@ import pandas as pd
 import xgboost as xgb
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from starlette.responses import Response
+
+try:
+    from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+    )
+except ImportError:  # pragma: no cover
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
+
+    class _NoopMetric:
+        def inc(self):
+            return None
+
+        def set(self, value):
+            return None
+
+        def time(self):
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    def Counter(*args, **kwargs):
+        return _NoopMetric()
+
+    def Gauge(*args, **kwargs):
+        return _NoopMetric()
+
+    def Histogram(*args, **kwargs):
+        return _NoopMetric()
+
+    def generate_latest():
+        return b"# prometheus_client is not installed\n"
+
 
 # Настраиваем логи
 logging.basicConfig(level=logging.INFO)
@@ -23,16 +64,40 @@ MODEL_PATH = BASE_DIR / "models" / "model.json"
 TRAIN_SCRIPT = BASE_DIR / "src" / "models" / "train_optuna.py"
 DEFAULT_MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
+PREDICTION_REQUESTS = Counter(
+    "energy_prediction_requests_total",
+    "Total prediction requests.",
+)
+PREDICTION_ERRORS = Counter(
+    "energy_prediction_errors_total",
+    "Total failed prediction requests.",
+)
+PREDICTION_LATENCY = Histogram(
+    "energy_prediction_latency_seconds",
+    "Prediction request latency.",
+)
+LAST_PREDICTED_PRICE = Gauge(
+    "energy_last_predicted_price",
+    "Last predicted energy price.",
+)
+MODEL_LOADED_GAUGE = Gauge(
+    "energy_model_loaded",
+    "Model loaded status: 1 loaded, 0 missing or failed.",
+)
+
 # Загружаем модель
 model = xgb.XGBRegressor()
 if MODEL_PATH.exists():
     try:
         model.load_model(str(MODEL_PATH))
         MODEL_LOADED = True
+        MODEL_LOADED_GAUGE.set(1)
         logger.info(f"Model loaded successfully from {MODEL_PATH}")
     except Exception as e:
+        MODEL_LOADED_GAUGE.set(0)
         logger.error(f"Failed to load model: {e}")
 else:
+    MODEL_LOADED_GAUGE.set(0)
     logger.warning("Model file not found!")
 
 
@@ -85,22 +150,32 @@ def health():
     return {"status": "ok", "model_loaded": MODEL_LOADED}
 
 
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.post("/predict")
 def predict(input_data: PredictionInput):
+    PREDICTION_REQUESTS.inc()
     try:
-        # Преобразуем Pydantic модель в DataFrame
-        X = pd.DataFrame([input_data.model_dump()])
+        with PREDICTION_LATENCY.time():
+            # Преобразуем Pydantic модель в DataFrame
+            X = pd.DataFrame([input_data.model_dump()])
 
-        # Предсказание
-        pred_log = model.predict(X)
+            # Предсказание
+            pred_log = model.predict(X)
 
-        # Обратное преобразование (exp(x) - 1) и учет смещения OFFSET=50
-        # Важно: убедись, что OFFSET вычитается именно в таком порядке
-        final_price = np.expm1(pred_log) - 50
+            # Обратное преобразование (exp(x) - 1) и учет смещения OFFSET=50
+            # Важно: убедись, что OFFSET вычитается именно в таком порядке
+            final_price = np.expm1(pred_log) - 50
 
-        return {"predicted_price": float(final_price[0])}
+        predicted_price = float(final_price[0])
+        LAST_PREDICTED_PRICE.set(predicted_price)
+        return {"predicted_price": predicted_price}
 
     except Exception as e:
+        PREDICTION_ERRORS.inc()
         logger.error(f"Prediction error: {e}")
         raise HTTPException(
             status_code=500, detail=f"Model prediction failed: {str(e)}"

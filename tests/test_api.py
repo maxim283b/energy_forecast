@@ -14,6 +14,14 @@ def test_health():
     assert response.json()["status"] == "ok"
 
 
+def test_metrics_endpoint():
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert (
+        "energy_model_loaded" in response.text or "prometheus_client" in response.text
+    )
+
+
 def test_prediction_endpoint():
     """Проверка предсказания с полным набором признаков"""
     # Создаем фиктивные данные, соответствующие классу PredictionInput
