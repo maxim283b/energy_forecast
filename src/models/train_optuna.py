@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
+from pathlib import Path
+
+import mlflow
+import numpy as np
+import optuna
 import pandas as pd
 import xgboost as xgb
-import mlflow
-import optuna
-import numpy as np
-import os
-from pathlib import Path
-from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import TimeSeriesSplit
 
 # Настройка путей
@@ -24,7 +25,7 @@ except ImportError:
 
 # Конфигурация
 DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
-MODEL_SAVE_PATH = BASE_DIR / "data/models/model.json"
+MODEL_SAVE_PATH = BASE_DIR / "models/model.json"
 REPORTS_DIR = BASE_DIR / "reports/figures"
 OFFSET = 50  # Смещение для работы с отрицательными ценами
 
@@ -83,7 +84,7 @@ def main():
     y = df["target"]
 
     # 2. Поиск гиперпараметров
-    print(f"--- Запуск Optuna: Поиск лучших параметров для логарифма ---")
+    print("--- Запуск Optuna: Поиск лучших параметров для логарифма ---")
     study = optuna.create_study(direction="minimize")
     study.optimize(lambda trial: objective(trial, X, y), n_trials=30)
 
@@ -129,7 +130,7 @@ def main():
         REPORTS_DIR.mkdir(parents=True, exist_ok=True)
         run_visualizations(best_model, test_df_viz, REPORTS_DIR)
 
-        print(f"\n--- Финальные результаты ---")
+        print("\n--- Финальные результаты ---")
         print(f"MAE:  {mae:.4f}")
         print(f"R2:   {r2:.4f}")
         print(f"RMSE: {rmse:.4f}")

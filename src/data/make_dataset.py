@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-import click
 import logging
-import pandas as pd
-import numpy as np
 from pathlib import Path
+
+import click
+import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 
 
@@ -34,7 +34,8 @@ def main(input_filepath, output_filepath):
         df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
 
         # 3. Обработка пропущенных значений
-        # В энергетике пропуски обычно вызваны сбоями API. Линейная интерполяция — лучший выбор.
+        # В энергетике пропуски обычно вызваны сбоями API.
+        # Линейная интерполяция здесь наиболее стабильна.
         initial_nans = df.isna().sum().sum()
         if initial_nans > 0:
             logger.info(
@@ -45,7 +46,7 @@ def main(input_filepath, output_filepath):
 
         # 4. Очистка выбросов (Clipping)
         # В Бельгии цены могут быть отрицательными (избыток генерации).
-        # Ограничиваем снизу на -50, чтобы модель не ловила аномальные "шумы" глубоких просадок.
+        # Ограничиваем снизу на -50, чтобы модель не ловила шум глубоких просадок.
         lower_bound = -50
         upper_bound = df["price"].quantile(
             0.995

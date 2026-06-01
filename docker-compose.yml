@@ -25,5 +25,5 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow_server:5000
     volumes:
-      - ./data/models:/app/data/models  # Позволяет обновлять модель без пересборки контейнера
+      - ./models:/app/models  # Позволяет обновлять модель без пересборки контейнера
     restart: always

@@ -110,10 +110,11 @@ data/**/*.parquet
 data/**/*.json
 !data/**/.gitkeep
 
-# Исключаем временные модели, если они не в dvc
-data/models/*.json
-data/models/*.xgb
-data/models/*.mlmodel
+# Исключаем временные модели, если они не в DVC
+models/*.json
+models/*.xgb
+models/*.mlmodel
+models/mlflow_model/
 
 # Plots (если хочешь хранить их только в MLflow)
 data/plots/*.png

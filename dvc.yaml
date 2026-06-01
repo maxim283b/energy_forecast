@@ -26,4 +26,4 @@ stages:
     - src/visualization/visualize.py
     - data/processed/energy_ready.csv
     outs:
-    - data/models/model.json
+    - models/model.json

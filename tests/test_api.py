@@ -1,6 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
-import app.main as main_module
+
+import src.api.main as main_module
 
 app = main_module.app
 

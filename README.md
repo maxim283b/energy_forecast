@@ -19,7 +19,7 @@ MLOps-проект для прогноза цены электроэнергии
 
 Последняя модель сохранена в:
 
-- `data/models/model.json`
+- `models/model.json`
 
 Эксперимент MLflow:
 
@@ -27,17 +27,17 @@ MLOps-проект для прогноза цены электроэнергии
 
 ## Структура проекта
 ```text
-├── app/                 <- FastAPI приложение
 ├── data/
 │   ├── raw/             <- исходные данные
 │   ├── interim/         <- очищенные данные
 │   ├── processed/       <- признаки для обучения
-│   ├── models/          <- сохранённая модель
 │   └── predictions/     <- локальные результаты инференса
 ├── docs/                <- документация
-├── helm/energy-api/     <- Helm chart для API и MLflow
+├── helm/                <- Helm chart и ArgoCD manifest
+├── models/              <- сериализованные модели
 ├── reports/figures/     <- графики обучения и визуализации
 ├── src/
+│   ├── api/             <- FastAPI приложение
 │   ├── data/            <- загрузка и очистка данных
 │   ├── features/        <- генерация признаков
 │   ├── models/          <- обучение и локальный инференс
@@ -80,7 +80,7 @@ MLflow доступен по адресу:
 
 ### 3. Запуск API локально
 ```bash
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8001
 ```
 
 Проверка health:
@@ -167,7 +167,7 @@ python3 -m compileall app src tests test_infra.py test_environment.py
 ## Deploy
 ```bash
 helm upgrade --install energy-api helm/energy-api --namespace default
-kubectl apply -f argocd-api-app.yaml
+kubectl apply -f helm/argocd-api-app.yaml
 ```
 
 Для Minikube:

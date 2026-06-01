@@ -61,7 +61,7 @@ stages:
       md5: d682af00906fa30005d07a6aecb1dce2
       size: 2967
     outs:
-    - path: data/models/model.json
+    - path: models/model.json
       hash: md5
       md5: 7522ed7b7f934f8bb7d31e63a9f220d9
       size: 2317895

@@ -1,14 +1,15 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import xgboost as xgb
-import pandas as pd
-import numpy as np
-from pathlib import Path
 import logging
 import os
 import subprocess
 import sys
 import uuid
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 # Настраиваем логи
 logging.basicConfig(level=logging.INFO)
@@ -16,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Energy Forecast API")
 
-MODEL_PATH = Path("data/models/model.json")
 MODEL_LOADED = False
-BASE_DIR = Path(__file__).resolve().parents[1]
+BASE_DIR = Path(__file__).resolve().parents[2]
+MODEL_PATH = BASE_DIR / "models" / "model.json"
 TRAIN_SCRIPT = BASE_DIR / "src" / "models" / "train_optuna.py"
 DEFAULT_MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 

@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import pandas as pd
-import numpy as np
-import xgboost as xgb
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import xgboost as xgb
 
 # Определение путей
 BASE_DIR = Path(__file__).resolve().parents[2]
-MODEL_PATH = BASE_DIR / "data/models/model.json"
+MODEL_PATH = BASE_DIR / "models/model.json"
 DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
 
 
@@ -40,7 +41,7 @@ def predict_local(data):
 
 
 def main():
-    print(f"--- 🚀 Запуск инференса (проверка пайплайна) ---")
+    print("--- 🚀 Запуск инференса (проверка пайплайна) ---")
 
     if not DATA_PATH.exists():
         print(f"Ошибка: Файл данных {DATA_PATH} не найден.")

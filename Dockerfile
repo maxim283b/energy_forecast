@@ -17,10 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://dow
 # Важно: Docker должен видеть папку src и data
 COPY src/ ./src/
 COPY data/ ./data/
-COPY app/ ./app/
 
 # Открываем порт для FastAPI
 EXPOSE 8000
 
 # Команда для запуска сервера
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

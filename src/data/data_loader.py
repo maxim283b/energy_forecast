@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import pandas as pd
-import numpy as np
-from entsoe import EntsoePandasClient
 import os
+import time
+from pathlib import Path
+
+import pandas as pd
 import requests
 from dotenv import load_dotenv
-from pathlib import Path
-import time
+from entsoe import EntsoePandasClient
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-import pandas as pd
-import numpy as np
-import holidays
 from pathlib import Path
+
+import holidays
+import numpy as np
+import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 INTERIM_PATH = BASE_DIR / "data/interim/energy_cleaned.csv"
@@ -146,7 +147,7 @@ def main():
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     final_df.to_csv(OUTPUT_PATH, index=False)
-    print(f"Success. Ready for training.")
+    print("Success. Ready for training.")
 
 
 if __name__ == "__main__":

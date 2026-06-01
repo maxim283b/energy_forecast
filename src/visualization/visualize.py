@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import pandas as pd
+
 import matplotlib.pyplot as plt
-import seaborn as sns
 import mlflow
 import numpy as np
-from pathlib import Path
+import pandas as pd
+import seaborn as sns
 
 
 def run_visualizations(model, df, reports_dir):
@@ -57,7 +57,7 @@ def run_visualizations(model, df, reports_dir):
     ax2.plot(lims, lims, "r--", lw=2)
     ax2.set_xlabel("Actual Price (EUR)")
     ax2.set_ylabel("Predicted Price (EUR)")
-    ax2.set_title(f"Actual vs Predicted (Real Scale)")
+    ax2.set_title("Actual vs Predicted (Real Scale)")
     mlflow.log_figure(fig2, "plots/2_actual_vs_predicted.png")
     plt.close(fig2)
 
@@ -79,4 +79,4 @@ def run_visualizations(model, df, reports_dir):
     mlflow.log_figure(fig3, "plots/3_time_series_zoom.png")
     plt.close(fig3)
 
-    print(f"Графики успешно обновлены и залогированы в MLflow (в шкале EUR).")
+    print("Графики успешно обновлены и залогированы в MLflow (в шкале EUR).")
