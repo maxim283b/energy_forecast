@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/maxim283b/energy_forecast/energy-api
-  pullPolicy: IfNotPresent
-  tag: "latest"
+  repository: energy-api
+  pullPolicy: Never
+  tag: "local"
 
 imagePullSecrets: []
 
