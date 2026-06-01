@@ -67,9 +67,20 @@ def test_prediction_endpoint():
         assert "anomaly_flag" in payload
 
 
-def test_retrain_endpoint_starts_job(monkeypatch):
+def test_retrain_endpoint_starts_job(monkeypatch, tmp_path):
     """Проверка запуска retrain без реального старта процесса."""
     calls = []
+    dataset = tmp_path / "data" / "processed" / "energy_ready.csv"
+    dataset.parent.mkdir(parents=True)
+    dataset.write_text("timestamp,target\n2024-01-01,1.0\n", encoding="utf-8")
+    train_script = tmp_path / "src" / "models" / "train_optuna.py"
+    train_script.parent.mkdir(parents=True)
+    train_script.write_text("print('train')\n", encoding="utf-8")
+    monkeypatch.setattr(main_module, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(main_module, "TRAIN_SCRIPT", train_script)
+    monkeypatch.setattr(
+        main_module, "RETRAIN_LOG_DIR", tmp_path / "reports" / "retrain"
+    )
 
     class DummyPopen:
         def __init__(self, *args, **kwargs):
@@ -101,8 +112,19 @@ def test_retrain_endpoint_starts_job(monkeypatch):
 
 
 def test_retrain_endpoint_requires_force_for_existing_model(monkeypatch, tmp_path):
+    dataset = tmp_path / "data" / "processed" / "energy_ready.csv"
+    dataset.parent.mkdir(parents=True)
+    dataset.write_text("timestamp,target\n2024-01-01,1.0\n", encoding="utf-8")
+    train_script = tmp_path / "src" / "models" / "train_optuna.py"
+    train_script.parent.mkdir(parents=True)
+    train_script.write_text("print('train')\n", encoding="utf-8")
     existing_model = tmp_path / "model.json"
     existing_model.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(main_module, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(main_module, "TRAIN_SCRIPT", train_script)
+    monkeypatch.setattr(
+        main_module, "RETRAIN_LOG_DIR", tmp_path / "reports" / "retrain"
+    )
     monkeypatch.setattr(main_module, "MODEL_PATH", existing_model)
 
     response = client.post(
