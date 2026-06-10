@@ -47,6 +47,7 @@ class RetrainResponse(BaseModel):
     tracking_uri: str
     dataset: str
     force: bool
+    status_url: str | None = None
 
 
 class RetrainStatus(BaseModel):
@@ -59,6 +60,9 @@ class RetrainStatus(BaseModel):
     return_code: int | None = None
     log_path: str | None = None
     model_reloaded: bool = False
+    progress: int = 0
+    stage: str = "pending"
+    message: str | None = None
 
 
 class DatasetUploadResponse(BaseModel):
@@ -99,3 +103,22 @@ class AdminArtifactsResponse(BaseModel):
     reports_generated: bool
     predictions_path: str | None = None
     reports_dir: str | None = None
+
+
+class AdminJobResponse(BaseModel):
+    status: str
+    job_id: str
+    job_type: str
+    status_url: str | None = None
+
+
+class AdminJobStatus(BaseModel):
+    status: str
+    job_id: str
+    job_type: str
+    started_at: str
+    finished_at: str | None = None
+    progress: int = 0
+    stage: str = "pending"
+    message: str | None = None
+    result: dict | None = None

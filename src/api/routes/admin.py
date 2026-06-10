@@ -28,3 +28,11 @@ def generate_artifacts():
         return admin_service.generate_artifacts()
     except admin_service.AdminServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get("/v1/admin/jobs/{job_id}", status_code=200)
+def admin_job_status(job_id: str):
+    try:
+        return admin_service.get_admin_job_status(job_id)
+    except admin_service.AdminServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

@@ -7,6 +7,7 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_EXPERIMENT = os.getenv("MLFLOW_EXPERIMENT", "Energy_Forecast_Final")
 
 RETRAIN_API_URL = os.getenv("RETRAIN_API_URL", "http://127.0.0.1:8001/v1/retrain")
+RETRAIN_STATUS_API_BASE = os.getenv("RETRAIN_STATUS_API_BASE", "http://127.0.0.1:8001/v1/retrain")
 ADMIN_DATASET_UPLOAD_URL = os.getenv(
     "ADMIN_DATASET_UPLOAD_URL",
     "http://127.0.0.1:8001/v1/admin/dataset/upload",
@@ -18,6 +19,10 @@ ADMIN_ENTSOE_FETCH_URL = os.getenv(
 ADMIN_GENERATE_ARTIFACTS_URL = os.getenv(
     "ADMIN_GENERATE_ARTIFACTS_URL",
     "http://127.0.0.1:8001/v1/admin/artifacts/generate",
+)
+ADMIN_JOB_STATUS_API_BASE = os.getenv(
+    "ADMIN_JOB_STATUS_API_BASE",
+    "http://127.0.0.1:8001/v1/admin/jobs",
 )
 RETRAIN_DATASET = os.getenv("RETRAIN_DATASET", "data/processed/energy_ready.csv")
 MODEL_PATH = Path(os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "model.json"))).resolve()

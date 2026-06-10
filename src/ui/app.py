@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import mlflow
@@ -19,12 +20,14 @@ from src.monitoring.config import (  # noqa: E402
     ADMIN_DATASET_UPLOAD_URL,
     ADMIN_ENTSOE_FETCH_URL,
     ADMIN_GENERATE_ARTIFACTS_URL,
+    ADMIN_JOB_STATUS_API_BASE,
     MLFLOW_EXPERIMENT,
     MLFLOW_TRACKING_URI,
     PREDICTIONS_PATH,
     REPORTS_DIR,
     RETRAIN_API_URL,
     RETRAIN_DATASET,
+    RETRAIN_STATUS_API_BASE,
     TRIGGER_STATUS_PATH,
 )
 
@@ -103,11 +106,54 @@ def call_retrain_api() -> None:
         response = requests.post(RETRAIN_API_URL, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-        st.success(f"Retrain started. job_id: {data.get('job_id', 'n/a')}")
+        job_id = data.get("job_id")
+        st.success(f"Retrain started. job_id: {job_id or 'n/a'}")
+        if job_id:
+            _track_job_progress(
+                f"{RETRAIN_STATUS_API_BASE}/{job_id}",
+                title="Retraining Progress",
+                completion_message="Retraining job finished.",
+            )
         st.json(data)
     except requests.RequestException as exc:
         st.error(f"Retrain API error: {exc}")
         st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
+
+
+def _track_job_progress(status_url: str, title: str, completion_message: str) -> None:
+    progress_placeholder = st.empty()
+    status_placeholder = st.empty()
+    details_placeholder = st.empty()
+
+    progress_bar = progress_placeholder.progress(0, text=title)
+    for _ in range(240):
+        try:
+            response = requests.get(status_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as exc:
+            status_placeholder.error(f"Status polling failed: {exc}")
+            return
+
+        progress = int(data.get("progress", 0))
+        stage = data.get("stage", "running")
+        message = data.get("message") or stage
+        status = data.get("status", "running")
+
+        progress_bar.progress(max(0, min(progress, 100)), text=f"{title}: {message}")
+        status_placeholder.caption(f"Stage: `{stage}` | Status: `{status}`")
+        details_placeholder.json(data)
+
+        if status in {"succeeded", "failed", "reload_failed"}:
+            if status == "succeeded":
+                st.success(completion_message)
+            else:
+                st.error(f"{title} ended with status: {status}")
+            return
+
+        time.sleep(2)
+
+    status_placeholder.warning(f"{title} is still running. Refresh the page to continue tracking.")
 
 
 def render_admin_upload() -> None:
@@ -128,9 +174,15 @@ def render_admin_upload() -> None:
             )
             response.raise_for_status()
             data = response.json()
-            st.success("Dataset uploaded and processed.")
+            st.success("Dataset upload job started.")
+            job_id = data.get("job_id")
+            if job_id:
+                _track_job_progress(
+                    f"{ADMIN_JOB_STATUS_API_BASE}/{job_id}",
+                    title="Dataset Upload Progress",
+                    completion_message="Dataset upload and processing finished.",
+                )
             st.json(data)
-            st.info("Processed dataset is ready. Start retraining separately if you want to refresh the model.")
         except requests.RequestException as exc:
             st.error(f"Upload API error: {exc}")
             st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
@@ -164,7 +216,14 @@ def render_admin_entsoe_fetch() -> None:
         response = requests.post(ADMIN_ENTSOE_FETCH_URL, json=payload, timeout=600)
         response.raise_for_status()
         data = response.json()
-        st.success("ENTSO-E dataset fetched and processed.")
+        st.success("ENTSO-E fetch job started.")
+        job_id = data.get("job_id")
+        if job_id:
+            _track_job_progress(
+                f"{ADMIN_JOB_STATUS_API_BASE}/{job_id}",
+                title="ENTSO-E Fetch Progress",
+                completion_message="ENTSO-E data fetch and processing finished.",
+            )
         st.json(data)
     except requests.RequestException as exc:
         st.error(f"ENTSO-E fetch error: {exc}")
@@ -178,7 +237,14 @@ def render_admin_artifacts() -> None:
             response = requests.post(ADMIN_GENERATE_ARTIFACTS_URL, timeout=300)
             response.raise_for_status()
             data = response.json()
-            st.success("Artifacts generation finished.")
+            st.success("Artifacts generation job started.")
+            job_id = data.get("job_id")
+            if job_id:
+                _track_job_progress(
+                    f"{ADMIN_JOB_STATUS_API_BASE}/{job_id}",
+                    title="Artifacts Generation Progress",
+                    completion_message="Predictions and drift reports generated.",
+                )
             st.json(data)
         except requests.RequestException as exc:
             st.error(f"Artifacts generation error: {exc}")

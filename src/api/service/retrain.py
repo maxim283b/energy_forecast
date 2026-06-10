@@ -36,10 +36,13 @@ def resolve_dataset_path(dataset: str) -> Path:
 
 
 def _watch_retrain_job(job_id: str, process: subprocess.Popen, log_file, started_at_monotonic: float) -> None:
+    job = RETRAIN_JOBS[job_id]
+    job["progress"] = 25
+    job["stage"] = "training"
+    job["message"] = "Model training is running."
     return_code = process.wait()
     log_file.close()
 
-    job = RETRAIN_JOBS[job_id]
     job["return_code"] = return_code
     job["finished_at"] = datetime.now(timezone.utc).isoformat()
     RETRAIN_ACTIVE_JOBS.dec()
@@ -47,10 +50,23 @@ def _watch_retrain_job(job_id: str, process: subprocess.Popen, log_file, started
     RETRAIN_LAST_FINISHED_TIMESTAMP.set(datetime.now(timezone.utc).timestamp())
 
     if return_code == 0:
+        job["progress"] = 90
+        job["stage"] = "reloading_model"
+        job["message"] = "Training finished. Reloading model in API."
         job["model_reloaded"] = model_service.reload_model()
         job["status"] = "succeeded" if job["model_reloaded"] else "reload_failed"
+        job["progress"] = 100
+        job["stage"] = "completed" if job["model_reloaded"] else "reload_failed"
+        job["message"] = (
+            "Retraining finished successfully."
+            if job["model_reloaded"]
+            else "Training finished but model reload failed."
+        )
     else:
         job["status"] = "failed"
+        job["progress"] = 100
+        job["stage"] = "failed"
+        job["message"] = f"Training process failed with return code {return_code}."
     RETRAIN_COMPLETIONS.labels(status=job["status"]).inc()
 
 
@@ -112,6 +128,9 @@ def start_retrain(request: RetrainRequest) -> RetrainResponse:
         "return_code": None,
         "log_path": str(log_path.relative_to(settings.BASE_DIR)),
         "model_reloaded": False,
+        "progress": 10,
+        "stage": "starting",
+        "message": "Retraining job has been started.",
     }
     if hasattr(process, "wait"):
         threading.Thread(
@@ -129,6 +148,7 @@ def start_retrain(request: RetrainRequest) -> RetrainResponse:
         tracking_uri=settings.DEFAULT_MLFLOW_TRACKING_URI,
         dataset=str(dataset_path.relative_to(settings.BASE_DIR)),
         force=request.force,
+        status_url=f"/v1/retrain/{job_id}",
     )
 
 
