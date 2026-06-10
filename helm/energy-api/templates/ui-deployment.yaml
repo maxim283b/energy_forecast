@@ -1,0 +1,85 @@
+{{- if .Values.ui.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "energy-api.uiFullname" . }}
+  labels:
+    {{- include "energy-api.uiLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.ui.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "energy-api.uiSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "energy-api.uiLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.sharedWorkspace.enabled }}
+      initContainers:
+        - name: prepare-ui-workspace
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p "{{ .Values.sharedWorkspace.mountPath }}/data"
+              mkdir -p "{{ .Values.sharedWorkspace.mountPath }}/reports/drift"
+          volumeMounts:
+            - name: shared-workspace
+              mountPath: {{ .Values.sharedWorkspace.mountPath }}
+      {{- end }}
+      containers:
+        - name: ui
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - streamlit
+            - run
+            - src/ui/app.py
+            - --server.address
+            - 0.0.0.0
+            - --server.port
+            - {{ .Values.ui.service.port | quote }}
+          env:
+            - name: MLFLOW_TRACKING_URI
+              {{- if and .Values.mlflow.enabled (not .Values.env.MLFLOW_TRACKING_URI) }}
+              value: {{ printf "http://%s:%v" (include "energy-api.mlflowFullname" .) .Values.mlflow.service.port | quote }}
+              {{- else }}
+              value: {{ default "http://localhost:5000" .Values.env.MLFLOW_TRACKING_URI | quote }}
+              {{- end }}
+            - name: RETRAIN_API_URL
+              value: {{ printf "http://%s:%v/v1/retrain" (include "energy-api.fullname" .) .Values.service.port | quote }}
+            - name: ADMIN_DATASET_UPLOAD_URL
+              value: {{ printf "http://%s:%v/v1/admin/dataset/upload" (include "energy-api.fullname" .) .Values.service.port | quote }}
+            - name: RETRAIN_DATASET
+              value: {{ .Values.retrainCron.dataset | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ui.service.port }}
+              protocol: TCP
+          volumeMounts:
+            {{- if .Values.sharedWorkspace.enabled }}
+            - name: shared-workspace
+              mountPath: /app/data
+              subPath: data
+            - name: shared-workspace
+              mountPath: /app/reports
+              subPath: reports
+            {{- end }}
+          {{- with .Values.ui.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        {{- if .Values.sharedWorkspace.enabled }}
+        - name: shared-workspace
+          persistentVolumeClaim:
+            claimName: {{ include "energy-api.workspacePvcName" . }}
+        {{- end }}
+{{- end }}

@@ -7,15 +7,17 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/maxim283b/energy_forecast.git'
-    targetRevision: develop
+    targetRevision: main
     path: helm/energy-api
     helm:
       valueFiles:
         - values-minikube.yaml
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: default
+    namespace: energy-forecast
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

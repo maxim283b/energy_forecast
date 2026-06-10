@@ -11,8 +11,10 @@ spec:
     path: helm/energy-api
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: default
+    namespace: energy-forecast
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

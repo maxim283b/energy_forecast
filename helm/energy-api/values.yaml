@@ -75,6 +75,14 @@ autoscaling:
 volumes: []
 volumeMounts: []
 
+sharedWorkspace:
+  enabled: true
+  existingClaim: ""
+  accessMode: ReadWriteOnce
+  size: 2Gi
+  storageClassName: ""
+  mountPath: /opt/energy-shared/workspace
+
 modelPersistence:
   enabled: true
   existingClaim: ""
@@ -111,8 +119,8 @@ mlflow:
     type: NodePort
     port: 5000
     nodePort: null
-  backendStoreUri: "sqlite:////mlflow/db/mlflow.db"
-  defaultArtifactRoot: "/mlflow/artifacts"
+  backendStoreUri: "sqlite:////mlflow/mlflow.db"
+  artifactsDestination: "/mlflow/artifacts"
   persistence:
     enabled: false
     size: 1Gi
@@ -151,4 +159,13 @@ grafana:
     nodePort: null
   adminUser: admin
   adminPassword: admin
+  resources: {}
+
+ui:
+  enabled: true
+  replicaCount: 1
+  service:
+    type: NodePort
+    port: 8501
+    nodePort: null
   resources: {}

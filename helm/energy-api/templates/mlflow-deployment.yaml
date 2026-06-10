@@ -15,6 +15,19 @@ spec:
       labels:
         {{- include "energy-api.mlflowLabels" . | nindent 8 }}
     spec:
+      initContainers:
+        - name: prepare-mlflow-storage
+          image: "{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
+          imagePullPolicy: {{ .Values.mlflow.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p {{ .Values.mlflow.persistence.mountPath | quote }}
+              mkdir -p {{ .Values.mlflow.artifactsDestination | quote }}
+          volumeMounts:
+            - name: mlflow-data
+              mountPath: {{ .Values.mlflow.persistence.mountPath }}
       containers:
         - name: mlflow
           image: "{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
@@ -28,8 +41,9 @@ spec:
             - {{ .Values.mlflow.service.port | quote }}
             - --backend-store-uri
             - {{ .Values.mlflow.backendStoreUri | quote }}
-            - --default-artifact-root
-            - {{ .Values.mlflow.defaultArtifactRoot | quote }}
+            - --serve-artifacts
+            - --artifacts-destination
+            - {{ .Values.mlflow.artifactsDestination | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.mlflow.service.port }}

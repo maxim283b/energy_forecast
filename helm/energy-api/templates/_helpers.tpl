@@ -103,3 +103,46 @@ helm.sh/chart: {{ include "energy-api.chart" . }}
 app.kubernetes.io/component: mlflow
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
+
+{{/*
+Create the UI component name.
+*/}}
+{{- define "energy-api.uiName" -}}
+{{- printf "%s-ui" (include "energy-api.name" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create the UI fully qualified name.
+*/}}
+{{- define "energy-api.uiFullname" -}}
+{{- printf "%s-ui" (include "energy-api.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+UI selector labels.
+*/}}
+{{- define "energy-api.uiSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "energy-api.uiName" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+UI common labels.
+*/}}
+{{- define "energy-api.uiLabels" -}}
+helm.sh/chart: {{ include "energy-api.chart" . }}
+{{ include "energy-api.uiSelectorLabels" . }}
+app.kubernetes.io/component: ui
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Create the shared workspace PVC name.
+*/}}
+{{- define "energy-api.workspacePvcName" -}}
+{{- if .Values.sharedWorkspace.existingClaim }}
+{{- .Values.sharedWorkspace.existingClaim }}
+{{- else }}
+{{- printf "%s-workspace" (include "energy-api.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}

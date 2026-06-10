@@ -1,5 +1,5 @@
 # Energy Forecast
-MLOps-проект для прогноза цены электроэнергии на базе XGBoost с DVC, MLflow, FastAPI и Docker.
+MLOps-проект для прогноза цены электроэнергии на базе XGBoost, DVC, MLflow, FastAPI и Minikube.
 
 ## Что уже есть
 - Python 3.11.
@@ -13,8 +13,7 @@ MLOps-проект для прогноза цены электроэнергии
 - Streamlit UI для прогнозов, drift-отчётов, качества модели, MLflow experiments,
   drift-уведомлений, ручного retrain и admin upload новых датасетов.
 - Prometheus и Grafana для runtime-метрик API.
-- Docker Compose для локального запуска MLflow, API, UI и мониторинга.
-- Helm chart для деплоя API и MLflow через ArgoCD.
+- Helm chart для запуска API, Streamlit UI, MLflow и мониторинга в Kubernetes.
 
 ## Последние результаты модели
 Последний сохранённый run в MLflow:
@@ -55,7 +54,6 @@ MLOps-проект для прогноза цены электроэнергии
 ├── tests/               <- API-тесты
 ├── dvc.yaml             <- DVC pipeline
 ├── dvc.lock             <- зафиксированное состояние пайплайна
-├── docker-compose.yml   <- локальный запуск MLflow и API
 └── README.md
 ```
 
@@ -86,36 +84,35 @@ dvc pull models/model.json
 
 Без `models/model.json` API запустится, но `/predict` вернет `503`.
 
-### 3. Запуск локальной инфраструктуры
+### 3. Запуск всего проекта в Minikube
 ```bash
-docker compose up -d mlflow_server energy_api streamlit_ui prometheus grafana
+minikube start
+eval $(minikube docker-env)
+docker build -t energy-api:local .
+kubectl create namespace energy-forecast
+helm upgrade --install energy-api helm/energy-api \
+  -f helm/energy-api/values-minikube.yaml \
+  --namespace energy-forecast
 ```
 
-Локальные адреса:
+Получение адресов сервисов:
 
-- API: `http://localhost:8080`
-- API metrics: `http://localhost:8080/metrics`
-- MLflow: `http://localhost:5000`
-- Streamlit UI: `http://localhost:8501`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000` (`admin` / `admin`)
+- API: `minikube service energy-api -n energy-forecast --url`
+- UI: `minikube service energy-api-ui -n energy-forecast --url`
+- MLflow: `minikube service energy-api-mlflow -n energy-forecast --url`
+- Prometheus: `minikube service energy-api-prometheus -n energy-forecast --url`
+- Grafana: `minikube service energy-api-grafana -n energy-forecast --url`
 
-### 4. Запуск API без Docker
-```bash
-python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8001
-```
+Что входит в релиз:
 
-Проверка health:
-```bash
-curl http://127.0.0.1:8001/health
-```
+- FastAPI API
+- Streamlit UI
+- MLflow
+- Prometheus
+- Grafana
+- Kubernetes CronJob для retrain
 
-Проверка Prometheus metrics:
-```bash
-curl http://127.0.0.1:8001/metrics
-```
-
-### 5. Запуск всего пайплайна
+### 4. Запуск всего пайплайна
 ```bash
 dvc repro
 ```
@@ -129,9 +126,9 @@ dvc repro
 - `predict`
 - `monitor`
 
-### 6. Переобучение через API
+### 5. Переобучение через API
 ```bash
-curl -X POST http://127.0.0.1:8001/v1/retrain \
+curl -X POST "$(minikube service energy-api --url)/v1/retrain" \
   -H "Content-Type: application/json" \
   -d '{"dataset":"data/processed/energy_ready.csv","force":true}'
 ```
@@ -142,7 +139,7 @@ curl -X POST http://127.0.0.1:8001/v1/retrain \
   "status": "started",
   "job_id": "<id>",
   "command": "python .../src/models/train_optuna.py",
-  "tracking_uri": "http://localhost:5000",
+  "tracking_uri": "http://energy-api-mlflow:5000",
   "dataset": "data/processed/energy_ready.csv",
   "force": true
 }
@@ -150,22 +147,22 @@ curl -X POST http://127.0.0.1:8001/v1/retrain \
 
 Статус фонового переобучения:
 ```bash
-curl http://127.0.0.1:8001/v1/retrain/<job_id>
+curl "$(minikube service energy-api --url)/v1/retrain/<job_id>"
 ```
 
 После успешного retrain API автоматически перечитывает `models/model.json`.
 Ручной reload модели:
 ```bash
-curl -X POST http://127.0.0.1:8001/v1/model/reload
+curl -X POST "$(minikube service energy-api --url)/v1/model/reload"
 ```
 
 В Kubernetes основным механизмом retrain должен быть не этот API, а `CronJob`.
 
-### 6.1. Загрузка новых данных через admin interface
+### 5.1. Загрузка новых данных через admin interface
 В UI добавлен `Admin` tab. Он отправляет CSV в API:
 
 ```bash
-curl -X POST http://127.0.0.1:8001/v1/admin/dataset/upload \
+curl -X POST "$(minikube service energy-api --url)/v1/admin/dataset/upload" \
   -F "file=@data/raw/new_dataset.csv"
 ```
 
@@ -187,7 +184,7 @@ python src/models/predict_model.py
 
 - `data/predictions/latest_forecast.csv`
 
-### 8. Drift monitoring и UI
+### 7. Drift monitoring и UI
 ```bash
 python src/monitoring/generate_reports.py
 streamlit run src/ui/app.py
@@ -215,7 +212,7 @@ AUTO_RETRAIN=true python src/monitoring/generate_reports.py
 0 2 * * * /path/to/energy_forecast/scripts/run_drift_monitor.sh >> /path/to/energy_forecast/reports/drift/cron.log 2>&1
 ```
 
-### 9. Retrain через Kubernetes CronJob
+### 8. Retrain через Kubernetes CronJob
 
 В Helm chart добавлен `CronJob`, который:
 
@@ -238,7 +235,7 @@ AUTO_RETRAIN=true python src/monitoring/generate_reports.py
 
 ```bash
 helm upgrade --install energy-api helm/energy-api \
-  --namespace default \
+  --namespace energy-forecast \
   --set retrainCron.enabled=true \
   --set retrainCron.schedule="0 2 * * *"
 ```
@@ -246,8 +243,6 @@ helm upgrade --install energy-api helm/energy-api \
 ## MLflow
 Tracking URI:
 
-- локально: `http://localhost:5000`
-- внутри Docker Compose: `http://mlflow_server:5000`
 - внутри Kubernetes: `http://<release>-energy-api-mlflow:5000`
 
 Модель и метрики логируются в MLflow вручную из `src/models/train_optuna.py`:
@@ -300,18 +295,37 @@ Production-like GitOps flow:
 - Merge/push в `main` публикует Docker image в GHCR и обновляет Helm image tag.
 - ArgoCD читает `main` и синхронизирует Helm chart в Kubernetes.
 
+Прямой деплой Helm:
 ```bash
-helm upgrade --install energy-api helm/energy-api --namespace default
-kubectl apply -f helm/argocd-api-app.yaml
+helm upgrade --install energy-api helm/energy-api \
+  -f helm/energy-api/values-minikube.yaml \
+  --namespace energy-forecast
 ```
 
-Для Minikube:
+GitOps через ArgoCD в Minikube:
 ```bash
 eval $(minikube docker-env)
 docker build -t energy-api:local .
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl rollout status deployment/argocd-server -n argocd
 kubectl apply -f helm/argocd-api-app-minikube.yaml
-minikube service energy-api --url
-minikube service energy-api-mlflow --url
+```
+
+Открыть ArgoCD:
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8081:443
+```
+
+UI ArgoCD будет доступен на:
+```bash
+https://localhost:8081
+```
+
+Начальный пароль admin:
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 --decode && echo
 ```
 
 ## Мониторинг

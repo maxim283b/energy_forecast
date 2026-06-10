@@ -43,6 +43,24 @@ spec:
           volumeMounts:
             - name: shared-models
               mountPath: {{ .Values.modelPersistence.mountPath }}
+        {{- if .Values.sharedWorkspace.enabled }}
+        - name: seed-workspace
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p "{{ .Values.sharedWorkspace.mountPath }}/data"
+              mkdir -p "{{ .Values.sharedWorkspace.mountPath }}/reports/drift"
+              if [ ! -f "{{ .Values.sharedWorkspace.mountPath }}/data/.seeded" ]; then
+                cp -R /app/data/. "{{ .Values.sharedWorkspace.mountPath }}/data/"
+                touch "{{ .Values.sharedWorkspace.mountPath }}/data/.seeded"
+              fi
+          volumeMounts:
+            - name: shared-workspace
+              mountPath: {{ .Values.sharedWorkspace.mountPath }}
+        {{- end }}
       {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
@@ -86,6 +104,14 @@ spec:
             - name: shared-models
               mountPath: {{ .Values.modelPersistence.mountPath }}
             {{- end }}
+            {{- if .Values.sharedWorkspace.enabled }}
+            - name: shared-workspace
+              mountPath: /app/data
+              subPath: data
+            - name: shared-workspace
+              mountPath: /app/reports
+              subPath: reports
+            {{- end }}
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -94,6 +120,11 @@ spec:
         - name: shared-models
           persistentVolumeClaim:
             claimName: {{ include "energy-api.modelPvcName" . }}
+        {{- end }}
+        {{- if .Values.sharedWorkspace.enabled }}
+        - name: shared-workspace
+          persistentVolumeClaim:
+            claimName: {{ include "energy-api.workspacePvcName" . }}
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

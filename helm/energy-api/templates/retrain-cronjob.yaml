@@ -54,6 +54,14 @@ spec:
               volumeMounts:
                 - name: shared-models
                   mountPath: {{ .Values.modelPersistence.mountPath }}
+                {{- if .Values.sharedWorkspace.enabled }}
+                - name: shared-workspace
+                  mountPath: /app/data
+                  subPath: data
+                - name: shared-workspace
+                  mountPath: /app/reports
+                  subPath: reports
+                {{- end }}
               {{- with .Values.retrainCron.resources }}
               resources:
                 {{- toYaml . | nindent 16 }}
@@ -62,6 +70,11 @@ spec:
             - name: shared-models
               persistentVolumeClaim:
                 claimName: {{ include "energy-api.modelPvcName" . }}
+            {{- if .Values.sharedWorkspace.enabled }}
+            - name: shared-workspace
+              persistentVolumeClaim:
+                claimName: {{ include "energy-api.workspacePvcName" . }}
+            {{- end }}
           {{- with .Values.nodeSelector }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}
