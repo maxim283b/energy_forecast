@@ -57,6 +57,10 @@ spec:
               value: {{ printf "http://%s:%v/v1/retrain" (include "energy-api.fullname" .) .Values.service.port | quote }}
             - name: ADMIN_DATASET_UPLOAD_URL
               value: {{ printf "http://%s:%v/v1/admin/dataset/upload" (include "energy-api.fullname" .) .Values.service.port | quote }}
+            - name: ADMIN_ENTSOE_FETCH_URL
+              value: {{ printf "http://%s:%v/v1/admin/dataset/fetch-entsoe" (include "energy-api.fullname" .) .Values.service.port | quote }}
+            - name: ADMIN_GENERATE_ARTIFACTS_URL
+              value: {{ printf "http://%s:%v/v1/admin/artifacts/generate" (include "energy-api.fullname" .) .Values.service.port | quote }}
             - name: RETRAIN_DATASET
               value: {{ .Values.retrainCron.dataset | quote }}
           ports:

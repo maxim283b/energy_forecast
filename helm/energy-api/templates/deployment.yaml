@@ -83,6 +83,10 @@ spec:
               {{- end }}
             - name: MODEL_PATH
               value: {{ default (printf "%s/model.json" .Values.modelPersistence.mountPath) .Values.env.MODEL_PATH | quote }}
+            {{- if .Values.env.ENTSOE_API_KEY }}
+            - name: ENTSOE_API_KEY
+              value: {{ .Values.env.ENTSOE_API_KEY | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

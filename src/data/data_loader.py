@@ -121,6 +121,23 @@ class EnergyDataGoldMiner:
             print(f"  Weather error: {e}")
             return None
 
+    def fetch_year_range_data(self, country_code: str, lat: float, lon: float, start_year: int, end_year: int):
+        if start_year > end_year:
+            raise ValueError("start_year must be less than or equal to end_year")
+
+        all_data = []
+        for year in range(start_year, end_year + 1):
+            result = self.fetch_year_data(country_code, lat, lon, year)
+            if result is not None:
+                all_data.append(result)
+            time.sleep(2)
+
+        if not all_data:
+            raise ValueError("No data fetched from ENTSO-E")
+
+        final_df = pd.concat(all_data, ignore_index=True)
+        return final_df.sort_values("timestamp").reset_index(drop=True)
+
 
 def main():
     miner = EnergyDataGoldMiner()

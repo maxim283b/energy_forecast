@@ -11,6 +11,14 @@ ADMIN_DATASET_UPLOAD_URL = os.getenv(
     "ADMIN_DATASET_UPLOAD_URL",
     "http://127.0.0.1:8001/v1/admin/dataset/upload",
 )
+ADMIN_ENTSOE_FETCH_URL = os.getenv(
+    "ADMIN_ENTSOE_FETCH_URL",
+    "http://127.0.0.1:8001/v1/admin/dataset/fetch-entsoe",
+)
+ADMIN_GENERATE_ARTIFACTS_URL = os.getenv(
+    "ADMIN_GENERATE_ARTIFACTS_URL",
+    "http://127.0.0.1:8001/v1/admin/artifacts/generate",
+)
 RETRAIN_DATASET = os.getenv("RETRAIN_DATASET", "data/processed/energy_ready.csv")
 MODEL_PATH = Path(os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "model.json"))).resolve()
 

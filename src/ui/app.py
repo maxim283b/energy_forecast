@@ -17,6 +17,8 @@ sys.path.append(str(BASE_DIR))
 
 from src.monitoring.config import (  # noqa: E402
     ADMIN_DATASET_UPLOAD_URL,
+    ADMIN_ENTSOE_FETCH_URL,
+    ADMIN_GENERATE_ARTIFACTS_URL,
     MLFLOW_EXPERIMENT,
     MLFLOW_TRACKING_URI,
     PREDICTIONS_PATH,
@@ -134,6 +136,54 @@ def render_admin_upload() -> None:
             st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
 
 
+def render_admin_entsoe_fetch() -> None:
+    st.subheader("Fetch Current Data From ENTSO-E")
+    st.caption(f"POST {ADMIN_ENTSOE_FETCH_URL}")
+
+    current_year = pd.Timestamp.utcnow().year
+    with st.form("entsoe_fetch_form"):
+        country_code = st.text_input("Country code", value="BE")
+        lat = st.number_input("Latitude", value=50.85, format="%.4f")
+        lon = st.number_input("Longitude", value=4.35, format="%.4f")
+        start_year = st.number_input("Start year", min_value=2015, max_value=current_year, value=current_year - 1)
+        end_year = st.number_input("End year", min_value=2015, max_value=current_year, value=current_year)
+        submitted = st.form_submit_button("Fetch ENTSO-E Dataset")
+
+    if not submitted:
+        st.info("Fetch fresh raw data from ENTSO-E, then rebuild processed data, predictions, and drift reports.")
+        return
+
+    payload = {
+        "country_code": country_code.strip().upper(),
+        "lat": lat,
+        "lon": lon,
+        "start_year": int(start_year),
+        "end_year": int(end_year),
+    }
+    try:
+        response = requests.post(ADMIN_ENTSOE_FETCH_URL, json=payload, timeout=600)
+        response.raise_for_status()
+        data = response.json()
+        st.success("ENTSO-E dataset fetched and processed.")
+        st.json(data)
+    except requests.RequestException as exc:
+        st.error(f"ENTSO-E fetch error: {exc}")
+
+
+def render_admin_artifacts() -> None:
+    st.subheader("Generate Predictions And Reports")
+    st.caption(f"POST {ADMIN_GENERATE_ARTIFACTS_URL}")
+    if st.button("Generate Latest Forecast And Drift Reports"):
+        try:
+            response = requests.post(ADMIN_GENERATE_ARTIFACTS_URL, timeout=300)
+            response.raise_for_status()
+            data = response.json()
+            st.success("Artifacts generation finished.")
+            st.json(data)
+        except requests.RequestException as exc:
+            st.error(f"Artifacts generation error: {exc}")
+
+
 def render_experiments() -> None:
     st.subheader("MLflow Experiments")
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -212,7 +262,9 @@ def main() -> None:
         render_experiments()
 
     with tab_admin:
+        render_admin_entsoe_fetch()
         render_admin_upload()
+        render_admin_artifacts()
 
 
 if __name__ == "__main__":

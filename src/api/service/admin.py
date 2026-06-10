@@ -17,8 +17,12 @@ from src.api.metrics import (
     DATASET_UPLOAD_REQUESTS,
     DATASET_UPLOAD_ROWS,
 )
+from src.api.schemas import EntsoeFetchRequest
+from src.data.data_loader import EnergyDataGoldMiner
 from src.data.make_dataset import clean_dataset
 from src.features.build_features import build_feature_dataset
+from src.models import predict_model
+from src.monitoring import generate_reports
 
 REQUIRED_UPLOAD_COLUMNS = {
     "timestamp",
@@ -52,6 +56,25 @@ def _validate_uploaded_csv(csv_path: Path) -> None:
         raise AdminServiceError(400, f"Dataset is missing required columns: {', '.join(missing_columns)}")
 
 
+def _refresh_artifacts() -> tuple[bool, bool]:
+    predictions_generated = False
+    reports_generated = False
+
+    try:
+        predict_model.main()
+        predictions_generated = settings.PREDICTIONS_PATH.exists()
+    except Exception:
+        predictions_generated = False
+
+    try:
+        generate_reports.main()
+        reports_generated = settings.REPORTS_DIR.exists()
+    except Exception:
+        reports_generated = False
+
+    return predictions_generated, reports_generated
+
+
 def upload_dataset(file: UploadFile) -> dict:
     started_at = perf_counter()
     filename = file.filename or ""
@@ -72,6 +95,7 @@ def upload_dataset(file: UploadFile) -> dict:
         interim_path = clean_dataset(raw_path, settings.INTERIM_DATA_PATH)
         processed_path = build_feature_dataset(interim_path, settings.PROCESSED_DATA_PATH)
         processed_df = pd.read_csv(processed_path)
+        predictions_generated, reports_generated = _refresh_artifacts()
         DATASET_UPLOAD_REQUESTS.labels(result="success").inc()
         DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
         DATASET_UPLOAD_ROWS.observe(len(processed_df))
@@ -97,4 +121,77 @@ def upload_dataset(file: UploadFile) -> dict:
         "processed_path": str(Path(processed_path).relative_to(settings.BASE_DIR)),
         "processed_rows": int(len(processed_df)),
         "ready_for_retrain": True,
+        "predictions_generated": predictions_generated,
+        "reports_generated": reports_generated,
+    }
+
+
+def fetch_entsoe_dataset(request: EntsoeFetchRequest) -> dict:
+    started_at = perf_counter()
+    if request.start_year > request.end_year:
+        raise AdminServiceError(400, "start_year must be less than or equal to end_year")
+
+    settings.RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    raw_name = (
+        f"{uuid.uuid4().hex}_entsoe_{request.country_code.lower()}_{request.start_year}_{request.end_year}.csv"
+    )
+    raw_path = settings.RAW_DATA_DIR / raw_name
+
+    try:
+        miner = EnergyDataGoldMiner()
+        dataset = miner.fetch_year_range_data(
+            request.country_code,
+            request.lat,
+            request.lon,
+            request.start_year,
+            request.end_year,
+        )
+        dataset.to_csv(raw_path, index=False)
+        _validate_uploaded_csv(raw_path)
+
+        interim_path = clean_dataset(raw_path, settings.INTERIM_DATA_PATH)
+        processed_path = build_feature_dataset(interim_path, settings.PROCESSED_DATA_PATH)
+        processed_df = pd.read_csv(processed_path)
+        predictions_generated, reports_generated = _refresh_artifacts()
+
+        DATASET_UPLOAD_REQUESTS.labels(result="success").inc()
+        DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
+        DATASET_UPLOAD_ROWS.observe(len(processed_df))
+        DATASET_LAST_UPLOAD_ROWS.set(len(processed_df))
+        DATASET_LAST_UPLOAD_FILE_SIZE_BYTES.set(raw_path.stat().st_size)
+        DATASET_LAST_UPLOAD_TIMESTAMP.set(datetime.now(timezone.utc).timestamp())
+    except AdminServiceError:
+        DATASET_UPLOAD_REQUESTS.labels(result="rejected").inc()
+        DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
+        raise
+    except Exception as exc:
+        DATASET_UPLOAD_REQUESTS.labels(result="error").inc()
+        DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
+        raise AdminServiceError(500, f"Failed to fetch ENTSO-E dataset: {exc}") from exc
+
+    return {
+        "status": "fetched",
+        "country_code": request.country_code,
+        "start_year": request.start_year,
+        "end_year": request.end_year,
+        "raw_path": str(raw_path.relative_to(settings.BASE_DIR)),
+        "interim_path": str(Path(interim_path).relative_to(settings.BASE_DIR)),
+        "processed_path": str(Path(processed_path).relative_to(settings.BASE_DIR)),
+        "processed_rows": int(len(processed_df)),
+        "ready_for_retrain": True,
+        "predictions_generated": predictions_generated,
+        "reports_generated": reports_generated,
+    }
+
+
+def generate_artifacts() -> dict:
+    predictions_generated, reports_generated = _refresh_artifacts()
+    return {
+        "status": "generated",
+        "predictions_generated": predictions_generated,
+        "reports_generated": reports_generated,
+        "predictions_path": str(settings.PREDICTIONS_PATH.relative_to(settings.BASE_DIR))
+        if settings.PREDICTIONS_PATH.exists()
+        else None,
+        "reports_dir": str(settings.REPORTS_DIR.relative_to(settings.BASE_DIR)) if settings.REPORTS_DIR.exists() else None,
     }

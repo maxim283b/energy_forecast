@@ -29,6 +29,7 @@ service:
 env:
   MLFLOW_TRACKING_URI: ""
   MODEL_PATH: ""
+  ENTSOE_API_KEY: ""
 
 ingress:
   enabled: false

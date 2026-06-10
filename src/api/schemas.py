@@ -69,3 +69,33 @@ class DatasetUploadResponse(BaseModel):
     processed_path: str
     processed_rows: int
     ready_for_retrain: bool
+
+
+class EntsoeFetchRequest(BaseModel):
+    country_code: str = "BE"
+    lat: float = 50.85
+    lon: float = 4.35
+    start_year: int
+    end_year: int
+
+
+class EntsoeFetchResponse(BaseModel):
+    status: str
+    country_code: str
+    start_year: int
+    end_year: int
+    raw_path: str
+    interim_path: str
+    processed_path: str
+    processed_rows: int
+    ready_for_retrain: bool
+    predictions_generated: bool
+    reports_generated: bool
+
+
+class AdminArtifactsResponse(BaseModel):
+    status: str
+    predictions_generated: bool
+    reports_generated: bool
+    predictions_path: str | None = None
+    reports_dir: str | None = None
