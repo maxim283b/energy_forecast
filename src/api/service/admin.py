@@ -1,11 +1,22 @@
 import re
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 
 import pandas as pd
 from fastapi import UploadFile
 
 from src.api import settings
+from src.api.metrics import (
+    DATASET_LAST_UPLOAD_FILE_SIZE_BYTES,
+    DATASET_LAST_UPLOAD_ROWS,
+    DATASET_LAST_UPLOAD_TIMESTAMP,
+    DATASET_UPLOAD_DURATION,
+    DATASET_UPLOAD_FILE_SIZE_BYTES,
+    DATASET_UPLOAD_REQUESTS,
+    DATASET_UPLOAD_ROWS,
+)
 from src.data.make_dataset import clean_dataset
 from src.features.build_features import build_feature_dataset
 
@@ -42,8 +53,10 @@ def _validate_uploaded_csv(csv_path: Path) -> None:
 
 
 def upload_dataset(file: UploadFile) -> dict:
+    started_at = perf_counter()
     filename = file.filename or ""
     if not filename.lower().endswith(".csv"):
+        DATASET_UPLOAD_REQUESTS.labels(result="rejected").inc()
         raise AdminServiceError(400, "Only CSV uploads are supported")
 
     settings.RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,15 +64,27 @@ def upload_dataset(file: UploadFile) -> dict:
     raw_path = settings.RAW_DATA_DIR / upload_name
 
     try:
-        raw_path.write_bytes(file.file.read())
+        file_bytes = file.file.read()
+        raw_path.write_bytes(file_bytes)
+        DATASET_UPLOAD_FILE_SIZE_BYTES.observe(len(file_bytes))
         _validate_uploaded_csv(raw_path)
 
         interim_path = clean_dataset(raw_path, settings.INTERIM_DATA_PATH)
         processed_path = build_feature_dataset(interim_path, settings.PROCESSED_DATA_PATH)
         processed_df = pd.read_csv(processed_path)
+        DATASET_UPLOAD_REQUESTS.labels(result="success").inc()
+        DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
+        DATASET_UPLOAD_ROWS.observe(len(processed_df))
+        DATASET_LAST_UPLOAD_ROWS.set(len(processed_df))
+        DATASET_LAST_UPLOAD_FILE_SIZE_BYTES.set(len(file_bytes))
+        DATASET_LAST_UPLOAD_TIMESTAMP.set(datetime.now(timezone.utc).timestamp())
     except AdminServiceError:
+        DATASET_UPLOAD_REQUESTS.labels(result="rejected").inc()
+        DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
         raise
     except Exception as exc:
+        DATASET_UPLOAD_REQUESTS.labels(result="error").inc()
+        DATASET_UPLOAD_DURATION.observe(perf_counter() - started_at)
         raise AdminServiceError(500, f"Failed to process uploaded dataset: {exc}") from exc
     finally:
         file.file.close()

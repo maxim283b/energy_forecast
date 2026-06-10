@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime, timezone
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -8,6 +10,11 @@ from src.api import settings
 from src.api.metrics import (
     LAST_PREDICTED_PRICE,
     MODEL_LOADED_GAUGE,
+    MODEL_FILE_MTIME_TIMESTAMP,
+    MODEL_FILE_SIZE_BYTES,
+    MODEL_LAST_RELOAD_TIMESTAMP,
+    MODEL_RELOAD_DURATION,
+    MODEL_RELOADS,
     PREDICTION_ANOMALIES,
     PREDICTION_ERRORS,
     PREDICTION_LATENCY,
@@ -37,9 +44,12 @@ def reload_model() -> bool:
     global MODEL_LOADED, model
 
     model = xgb.XGBRegressor()
+    started_at = perf_counter()
     if not settings.MODEL_PATH.exists():
         MODEL_LOADED = False
         MODEL_LOADED_GAUGE.set(0)
+        MODEL_RELOADS.labels(result="missing").inc()
+        MODEL_RELOAD_DURATION.observe(perf_counter() - started_at)
         logger.warning("Model file not found: %s", settings.MODEL_PATH)
         return False
 
@@ -47,11 +57,18 @@ def reload_model() -> bool:
         model.load_model(str(settings.MODEL_PATH))
         MODEL_LOADED = True
         MODEL_LOADED_GAUGE.set(1)
+        MODEL_RELOADS.labels(result="success").inc()
+        MODEL_RELOAD_DURATION.observe(perf_counter() - started_at)
+        MODEL_LAST_RELOAD_TIMESTAMP.set(datetime.now(timezone.utc).timestamp())
+        MODEL_FILE_SIZE_BYTES.set(settings.MODEL_PATH.stat().st_size)
+        MODEL_FILE_MTIME_TIMESTAMP.set(settings.MODEL_PATH.stat().st_mtime)
         logger.info("Model loaded successfully from %s", settings.MODEL_PATH)
         return True
     except Exception:
         MODEL_LOADED = False
         MODEL_LOADED_GAUGE.set(0)
+        MODEL_RELOADS.labels(result="error").inc()
+        MODEL_RELOAD_DURATION.observe(perf_counter() - started_at)
         logger.exception("Failed to load model")
         return False
 

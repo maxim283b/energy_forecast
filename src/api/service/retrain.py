@@ -5,9 +5,17 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 
 from src.api import settings
 from src.api.schemas import RetrainRequest, RetrainResponse, RetrainStatus
+from src.api.metrics import (
+    RETRAIN_ACTIVE_JOBS,
+    RETRAIN_COMPLETIONS,
+    RETRAIN_DURATION,
+    RETRAIN_LAST_FINISHED_TIMESTAMP,
+    RETRAIN_REQUESTS,
+)
 from src.api.service import model as model_service
 
 RETRAIN_JOBS: dict[str, dict] = {}
@@ -27,35 +35,43 @@ def resolve_dataset_path(dataset: str) -> Path:
     return path.resolve()
 
 
-def _watch_retrain_job(job_id: str, process: subprocess.Popen, log_file) -> None:
+def _watch_retrain_job(job_id: str, process: subprocess.Popen, log_file, started_at_monotonic: float) -> None:
     return_code = process.wait()
     log_file.close()
 
     job = RETRAIN_JOBS[job_id]
     job["return_code"] = return_code
     job["finished_at"] = datetime.now(timezone.utc).isoformat()
+    RETRAIN_ACTIVE_JOBS.dec()
+    RETRAIN_DURATION.observe(perf_counter() - started_at_monotonic)
+    RETRAIN_LAST_FINISHED_TIMESTAMP.set(datetime.now(timezone.utc).timestamp())
 
     if return_code == 0:
         job["model_reloaded"] = model_service.reload_model()
         job["status"] = "succeeded" if job["model_reloaded"] else "reload_failed"
     else:
         job["status"] = "failed"
+    RETRAIN_COMPLETIONS.labels(status=job["status"]).inc()
 
 
 def start_retrain(request: RetrainRequest) -> RetrainResponse:
     if not settings.TRAIN_SCRIPT.exists():
+        RETRAIN_REQUESTS.labels(result="rejected").inc()
         raise RetrainServiceError(404, "Training script not found")
 
     dataset_path = resolve_dataset_path(request.dataset)
     try:
         dataset_path.relative_to(settings.BASE_DIR)
     except ValueError as exc:
+        RETRAIN_REQUESTS.labels(result="rejected").inc()
         raise RetrainServiceError(400, "Dataset must be inside project") from exc
 
     if not dataset_path.exists():
+        RETRAIN_REQUESTS.labels(result="rejected").inc()
         raise RetrainServiceError(404, "Dataset not found")
 
     if settings.MODEL_PATH.exists() and not request.force:
+        RETRAIN_REQUESTS.labels(result="rejected").inc()
         raise RetrainServiceError(409, "Model already exists. Set force=true to retrain.")
 
     job_id = uuid.uuid4().hex
@@ -72,6 +88,7 @@ def start_retrain(request: RetrainRequest) -> RetrainResponse:
 
     try:
         log_file = log_path.open("w", encoding="utf-8")
+        started_at_monotonic = perf_counter()
         process = subprocess.Popen(
             command,
             cwd=str(settings.BASE_DIR),
@@ -80,8 +97,11 @@ def start_retrain(request: RetrainRequest) -> RetrainResponse:
             stderr=subprocess.STDOUT,
         )
     except Exception as exc:
+        RETRAIN_REQUESTS.labels(result="error").inc()
         raise RetrainServiceError(500, f"Failed to start retrain: {exc}") from exc
 
+    RETRAIN_REQUESTS.labels(result="accepted").inc()
+    RETRAIN_ACTIVE_JOBS.inc()
     RETRAIN_JOBS[job_id] = {
         "status": "running",
         "job_id": job_id,
@@ -94,7 +114,11 @@ def start_retrain(request: RetrainRequest) -> RetrainResponse:
         "model_reloaded": False,
     }
     if hasattr(process, "wait"):
-        threading.Thread(target=_watch_retrain_job, args=(job_id, process, log_file), daemon=True).start()
+        threading.Thread(
+            target=_watch_retrain_job,
+            args=(job_id, process, log_file, started_at_monotonic),
+            daemon=True,
+        ).start()
     else:  # pragma: no cover - used by lightweight test doubles
         log_file.close()
 
