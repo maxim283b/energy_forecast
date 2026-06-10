@@ -59,3 +59,13 @@ class RetrainStatus(BaseModel):
     return_code: int | None = None
     log_path: str | None = None
     model_reloaded: bool = False
+
+
+class DatasetUploadResponse(BaseModel):
+    status: str
+    filename: str
+    raw_path: str
+    interim_path: str
+    processed_path: str
+    processed_rows: int
+    ready_for_retrain: bool

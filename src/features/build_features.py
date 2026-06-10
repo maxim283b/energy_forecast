@@ -1,9 +1,18 @@
 # -*- coding: utf-8 -*-
 from pathlib import Path
 
-import holidays
 import numpy as np
 import pandas as pd
+
+try:
+    import holidays
+except ImportError:  # pragma: no cover
+    class _FallbackHolidays:
+        @staticmethod
+        def BE():
+            return set()
+
+    holidays = _FallbackHolidays()
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 INTERIM_PATH = BASE_DIR / "data/interim/energy_cleaned.csv"
@@ -76,14 +85,17 @@ def add_lags_and_rolling(df):
     return df
 
 
-def main():
+def build_feature_dataset(
+    input_path: str | Path | None = None,
+    output_path: str | Path = OUTPUT_PATH,
+) -> Path:
     print("--- Start Feature Engineering: Cross-Border & Physics Protocol ---")
-    input_path = INTERIM_PATH if INTERIM_PATH.exists() else RAW_PATH
-    if not input_path.exists():
-        print(f"Error: {input_path} not found")
-        return
+    source_path = Path(input_path) if input_path else (INTERIM_PATH if INTERIM_PATH.exists() else RAW_PATH)
+    target_path = Path(output_path)
+    if not source_path.exists():
+        raise FileNotFoundError(f"{source_path} not found")
 
-    df = pd.read_csv(input_path)
+    df = pd.read_csv(source_path)
 
     # Ограничение выбросов (Clipping)
     upper_limit = df["price"].quantile(0.99)
@@ -137,9 +149,14 @@ def main():
     print(f"Total features: {len(final_df.columns) - 2}")
     print(f"Final shape: {final_df.shape}")
 
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    final_df.to_csv(OUTPUT_PATH, index=False)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    final_df.to_csv(target_path, index=False)
     print("Success. Ready for training.")
+    return target_path
+
+
+def main():
+    build_feature_dataset()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from fastapi.testclient import TestClient
 
 import src.api.main as main_module
@@ -182,3 +183,44 @@ def test_retrain_endpoint_requires_force_for_existing_model(monkeypatch, tmp_pat
 
     assert response.status_code == 409
     assert "force=true" in response.json()["detail"]
+
+
+def test_admin_dataset_upload_processes_pipeline(monkeypatch, tmp_path):
+    raw_dir = tmp_path / "data" / "raw"
+    interim_path = tmp_path / "data" / "interim" / "energy_cleaned.csv"
+    processed_path = tmp_path / "data" / "processed" / "energy_ready.csv"
+    monkeypatch.setattr(settings, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(settings, "RAW_DATA_DIR", raw_dir)
+    monkeypatch.setattr(settings, "INTERIM_DATA_PATH", interim_path)
+    monkeypatch.setattr(settings, "PROCESSED_DATA_PATH", processed_path)
+
+    rows = 220
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=rows, freq="h", tz="UTC").astype(str),
+            "price": np.linspace(10, 100, rows),
+            "load_forecast": np.linspace(1000, 1200, rows),
+            "solar_forecast": np.linspace(50, 90, rows),
+            "wind_forecast": np.linspace(40, 70, rows),
+            "temperature_2m": np.linspace(5, 20, rows),
+            "wind_speed_10m": np.linspace(2, 8, rows),
+            "direct_radiation": np.linspace(0, 300, rows),
+            "price_fr": np.linspace(12, 102, rows),
+            "price_de": np.linspace(11, 101, rows),
+            "price_nl": np.linspace(13, 103, rows),
+        }
+    )
+
+    response = client.post(
+        "/v1/admin/dataset/upload",
+        files={"file": ("admin_upload.csv", df.to_csv(index=False), "text/csv")},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "uploaded"
+    assert payload["ready_for_retrain"] is True
+    assert payload["processed_rows"] > 0
+    assert raw_dir.exists()
+    assert interim_path.exists()
+    assert processed_path.exists()

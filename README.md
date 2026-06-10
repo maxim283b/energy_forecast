@@ -7,9 +7,11 @@ MLOps-проект для прогноза цены электроэнергии
 - MLflow для трекинга экспериментов, метрик, регистрации модели и drift-отчётов.
 - DVC для версионирования данных и воспроизводимого запуска пайплайна.
 - FastAPI-сервис с `/health`, `/metrics`, `/predict`, `POST /v1/retrain`,
-  `GET /v1/retrain/{job_id}` и `POST /v1/model/reload`.
+  `GET /v1/retrain/{job_id}`, `POST /v1/model/reload` и admin upload endpoint
+  для загрузки новых данных.
+- Kubernetes CronJob для планового retrain внутри кластера.
 - Streamlit UI для прогнозов, drift-отчётов, качества модели, MLflow experiments,
-  drift-уведомлений и ручного retrain.
+  drift-уведомлений, ручного retrain и admin upload новых датасетов.
 - Prometheus и Grafana для runtime-метрик API.
 - Docker Compose для локального запуска MLflow, API, UI и мониторинга.
 - Helm chart для деплоя API и MLflow через ArgoCD.
@@ -157,6 +159,25 @@ curl http://127.0.0.1:8001/v1/retrain/<job_id>
 curl -X POST http://127.0.0.1:8001/v1/model/reload
 ```
 
+В Kubernetes основным механизмом retrain должен быть не этот API, а `CronJob`.
+
+### 6.1. Загрузка новых данных через admin interface
+В UI добавлен `Admin` tab. Он отправляет CSV в API:
+
+```bash
+curl -X POST http://127.0.0.1:8001/v1/admin/dataset/upload \
+  -F "file=@data/raw/new_dataset.csv"
+```
+
+После загрузки API:
+
+- сохраняет файл в `data/raw/`
+- прогоняет `clean -> featurize`
+- обновляет `data/interim/energy_cleaned.csv`
+- обновляет `data/processed/energy_ready.csv`
+
+Это подготавливает данные для следующего retrain.
+
 ### 7. Локальный инференс
 ```bash
 python src/models/predict_model.py
@@ -192,6 +213,34 @@ AUTO_RETRAIN=true python src/monitoring/generate_reports.py
 
 ```bash
 0 2 * * * /path/to/energy_forecast/scripts/run_drift_monitor.sh >> /path/to/energy_forecast/reports/drift/cron.log 2>&1
+```
+
+### 9. Retrain через Kubernetes CronJob
+
+В Helm chart добавлен `CronJob`, который:
+
+- по расписанию запускает drift-monitoring
+- если drift-пороги превышены, запускает `src/models/train_optuna.py`
+- сохраняет модель в общий PVC
+- вызывает `POST /v1/model/reload`, чтобы API перечитал новую модель
+
+Ключевые values:
+
+- `modelPersistence.enabled`
+- `modelPersistence.size`
+- `modelPersistence.mountPath`
+- `retrainCron.enabled`
+- `retrainCron.schedule`
+- `retrainCron.dataset`
+- `retrainCron.force`
+
+Пример:
+
+```bash
+helm upgrade --install energy-api helm/energy-api \
+  --namespace default \
+  --set retrainCron.enabled=true \
+  --set retrainCron.schedule="0 2 * * *"
 ```
 
 ## MLflow
@@ -232,6 +281,7 @@ CI восстанавливает `models/model.json` через `dvc pull` пе
 - `POST /v1/model/reload`
 - `POST /v1/retrain`
 - `GET /v1/retrain/{job_id}`
+- `POST /v1/admin/dataset/upload`
 
 ## Проверка качества
 ```bash

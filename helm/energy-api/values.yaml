@@ -28,6 +28,7 @@ service:
 
 env:
   MLFLOW_TRACKING_URI: ""
+  MODEL_PATH: ""
 
 ingress:
   enabled: false
@@ -73,6 +74,27 @@ autoscaling:
 
 volumes: []
 volumeMounts: []
+
+modelPersistence:
+  enabled: true
+  existingClaim: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClassName: ""
+  mountPath: /opt/energy-shared/models
+  seedFromImage: true
+
+retrainCron:
+  enabled: true
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  backoffLimit: 1
+  dataset: data/processed/energy_ready.csv
+  force: false
+  reloadAfterTrain: true
+  resources: {}
 
 nodeSelector: {}
 tolerations: []

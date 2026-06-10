@@ -28,6 +28,22 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "energy-api.serviceAccountName" . }}
+      {{- if and .Values.modelPersistence.enabled .Values.modelPersistence.seedFromImage }}
+      initContainers:
+        - name: seed-model
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ ! -f "{{ .Values.modelPersistence.mountPath }}/model.json" ] && [ -f "/app/models/model.json" ]; then
+                cp /app/models/model.json "{{ .Values.modelPersistence.mountPath }}/model.json"
+              fi
+          volumeMounts:
+            - name: shared-models
+              mountPath: {{ .Values.modelPersistence.mountPath }}
+      {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -47,6 +63,8 @@ spec:
               {{- else }}
               value: {{ default "http://localhost:5000" .Values.env.MLFLOW_TRACKING_URI | quote }}
               {{- end }}
+            - name: MODEL_PATH
+              value: {{ default (printf "%s/model.json" .Values.modelPersistence.mountPath) .Values.env.MODEL_PATH | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
@@ -63,14 +81,23 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.volumeMounts }}
           volumeMounts:
+            {{- if .Values.modelPersistence.enabled }}
+            - name: shared-models
+              mountPath: {{ .Values.modelPersistence.mountPath }}
+            {{- end }}
+            {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
-          {{- end }}
-      {{- with .Values.volumes }}
+            {{- end }}
       volumes:
+        {{- if .Values.modelPersistence.enabled }}
+        - name: shared-models
+          persistentVolumeClaim:
+            claimName: {{ include "energy-api.modelPvcName" . }}
+        {{- end }}
+        {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

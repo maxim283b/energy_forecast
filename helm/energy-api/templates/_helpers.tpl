@@ -76,6 +76,17 @@ Create the MLflow fully qualified name.
 {{- end }}
 
 {{/*
+Create the shared model PVC name.
+*/}}
+{{- define "energy-api.modelPvcName" -}}
+{{- if .Values.modelPersistence.existingClaim }}
+{{- .Values.modelPersistence.existingClaim }}
+{{- else }}
+{{- printf "%s-models" (include "energy-api.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+
+{{/*
 MLflow selector labels.
 */}}
 {{- define "energy-api.mlflowSelectorLabels" -}}

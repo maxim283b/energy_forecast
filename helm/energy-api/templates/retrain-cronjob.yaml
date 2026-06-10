@@ -1,0 +1,77 @@
+{{- if .Values.retrainCron.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-retrain" (include "energy-api.fullname" .) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "energy-api.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.retrainCron.schedule | quote }}
+  concurrencyPolicy: {{ .Values.retrainCron.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.retrainCron.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.retrainCron.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.retrainCron.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            {{- include "energy-api.labels" . | nindent 12 }}
+            app.kubernetes.io/component: retrain-cron
+        spec:
+          serviceAccountName: {{ include "energy-api.serviceAccountName" . }}
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: retrain
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - python
+                - src/models/retrain_cron.py
+              env:
+                - name: MLFLOW_TRACKING_URI
+                  {{- if and .Values.mlflow.enabled (not .Values.env.MLFLOW_TRACKING_URI) }}
+                  value: {{ printf "http://%s:%v" (include "energy-api.mlflowFullname" .) .Values.mlflow.service.port | quote }}
+                  {{- else }}
+                  value: {{ default "http://localhost:5000" .Values.env.MLFLOW_TRACKING_URI | quote }}
+                  {{- end }}
+                - name: MODEL_PATH
+                  value: {{ default (printf "%s/model.json" .Values.modelPersistence.mountPath) .Values.env.MODEL_PATH | quote }}
+                - name: RETRAIN_DATASET
+                  value: {{ .Values.retrainCron.dataset | quote }}
+                - name: FORCE_RETRAIN
+                  value: {{ ternary "true" "false" .Values.retrainCron.force | quote }}
+                - name: RELOAD_MODEL_URL
+                  {{- if .Values.retrainCron.reloadAfterTrain }}
+                  value: {{ printf "http://%s:%v/v1/model/reload" (include "energy-api.fullname" .) .Values.service.port | quote }}
+                  {{- else }}
+                  value: ""
+                  {{- end }}
+              volumeMounts:
+                - name: shared-models
+                  mountPath: {{ .Values.modelPersistence.mountPath }}
+              {{- with .Values.retrainCron.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+          volumes:
+            - name: shared-models
+              persistentVolumeClaim:
+                claimName: {{ include "energy-api.modelPvcName" . }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

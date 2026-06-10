@@ -1,0 +1,17 @@
+{{- if and .Values.modelPersistence.enabled (not .Values.modelPersistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "energy-api.modelPvcName" . }}
+  labels:
+    {{- include "energy-api.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.modelPersistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.modelPersistence.size }}
+  {{- with .Values.modelPersistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

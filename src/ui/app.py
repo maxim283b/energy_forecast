@@ -16,6 +16,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(BASE_DIR))
 
 from src.monitoring.config import (  # noqa: E402
+    ADMIN_DATASET_UPLOAD_URL,
     MLFLOW_EXPERIMENT,
     MLFLOW_TRACKING_URI,
     PREDICTIONS_PATH,
@@ -107,6 +108,32 @@ def call_retrain_api() -> None:
         st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
 
 
+def render_admin_upload() -> None:
+    st.subheader("Admin Dataset Upload")
+    st.caption(f"POST {ADMIN_DATASET_UPLOAD_URL}")
+    uploaded_file = st.file_uploader("Upload raw dataset (.csv)", type=["csv"], key="admin_dataset_upload")
+    if uploaded_file is None:
+        st.info("Upload a CSV to refresh raw/interim/processed datasets.")
+        return
+
+    if st.button("Process Uploaded Dataset"):
+        try:
+            uploaded_file.seek(0)
+            response = requests.post(
+                ADMIN_DATASET_UPLOAD_URL,
+                files={"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")},
+                timeout=120,
+            )
+            response.raise_for_status()
+            data = response.json()
+            st.success("Dataset uploaded and processed.")
+            st.json(data)
+            st.info("Processed dataset is ready. Start retraining separately if you want to refresh the model.")
+        except requests.RequestException as exc:
+            st.error(f"Upload API error: {exc}")
+            st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
+
+
 def render_experiments() -> None:
     st.subheader("MLflow Experiments")
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -155,12 +182,13 @@ def main() -> None:
 
     render_drift_notifications()
 
-    tab_predictions, tab_drift, tab_quality, tab_experiments = st.tabs(
+    tab_predictions, tab_drift, tab_quality, tab_experiments, tab_admin = st.tabs(
         [
             "Inference & History",
             "Data & Target Drift",
             "Model Quality",
             "Experiments",
+            "Admin",
         ]
     )
 
@@ -182,6 +210,9 @@ def main() -> None:
 
     with tab_experiments:
         render_experiments()
+
+    with tab_admin:
+        render_admin_upload()
 
 
 if __name__ == "__main__":

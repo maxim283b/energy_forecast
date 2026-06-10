@@ -24,7 +24,7 @@ except ImportError:
 
 # Конфигурация
 DEFAULT_DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
-MODEL_SAVE_PATH = BASE_DIR / "models/model.json"
+MODEL_SAVE_PATH = Path(os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "model.json"))).resolve()
 REPORTS_DIR = BASE_DIR / "reports/figures"
 OFFSET = 50  # Смещение для работы с отрицательными ценами
 

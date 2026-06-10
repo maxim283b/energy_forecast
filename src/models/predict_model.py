@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +8,7 @@ import xgboost as xgb
 
 # Определение путей
 BASE_DIR = Path(__file__).resolve().parents[2]
-MODEL_PATH = BASE_DIR / "models/model.json"
+MODEL_PATH = Path(os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "model.json"))).resolve()
 DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
 OFFSET = 50
 
