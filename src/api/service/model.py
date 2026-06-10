@@ -9,10 +9,10 @@ import xgboost as xgb
 from src.api import settings
 from src.api.metrics import (
     LAST_PREDICTED_PRICE,
-    MODEL_LOADED_GAUGE,
     MODEL_FILE_MTIME_TIMESTAMP,
     MODEL_FILE_SIZE_BYTES,
     MODEL_LAST_RELOAD_TIMESTAMP,
+    MODEL_LOADED_GAUGE,
     MODEL_RELOAD_DURATION,
     MODEL_RELOADS,
     PREDICTION_ANOMALIES,

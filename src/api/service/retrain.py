@@ -8,7 +8,6 @@ from pathlib import Path
 from time import perf_counter
 
 from src.api import settings
-from src.api.schemas import RetrainRequest, RetrainResponse, RetrainStatus
 from src.api.metrics import (
     RETRAIN_ACTIVE_JOBS,
     RETRAIN_COMPLETIONS,
@@ -16,6 +15,7 @@ from src.api.metrics import (
     RETRAIN_LAST_FINISHED_TIMESTAMP,
     RETRAIN_REQUESTS,
 )
+from src.api.schemas import RetrainRequest, RetrainResponse, RetrainStatus
 from src.api.service import model as model_service
 
 RETRAIN_JOBS: dict[str, dict] = {}
