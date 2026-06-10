@@ -65,9 +65,7 @@ def render_predictions() -> None:
 
     predictions = pd.read_csv(PREDICTIONS_PATH)
     if "predicted_price" in predictions.columns and "anomaly_flag" not in predictions:
-        predictions["anomaly_flag"] = (predictions["predicted_price"] < 0) | (
-            predictions["predicted_price"] > 200
-        )
+        predictions["anomaly_flag"] = (predictions["predicted_price"] < 0) | (predictions["predicted_price"] > 200)
 
     st.dataframe(predictions, use_container_width=True)
 
@@ -106,10 +104,7 @@ def call_retrain_api() -> None:
         st.json(data)
     except requests.RequestException as exc:
         st.error(f"Retrain API error: {exc}")
-        st.info(
-            "Run the API in another terminal: "
-            "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`"
-        )
+        st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
 
 
 def render_experiments() -> None:

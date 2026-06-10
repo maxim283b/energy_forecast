@@ -27,9 +27,7 @@ def add_model_predictions(df: pd.DataFrame) -> pd.DataFrame:
     if "target" not in df.columns:
         raise ValueError("Column 'target' is required")
 
-    feature_cols = [
-        col for col in df.columns if col not in {"timestamp", "target", "prediction"}
-    ]
+    feature_cols = [col for col in df.columns if col not in {"timestamp", "target", "prediction"}]
     x = df[feature_cols].copy()
 
     model = xgb.XGBRegressor()
@@ -153,17 +151,13 @@ def evaluate_retrain_trigger(
         mae_increase = (current_mae - baseline["mae"]) / baseline["mae"]
         if mae_increase > MAE_INCREASE_RATIO:
             reasons.append(
-                f"MAE increased {mae_increase:.1%} vs baseline "
-                f"({current_mae:.2f} vs {baseline['mae']:.2f})"
+                f"MAE increased {mae_increase:.1%} vs baseline " f"({current_mae:.2f} vs {baseline['mae']:.2f})"
             )
 
     if current_r2 is not None and baseline.get("r2") is not None:
         r2_drop = baseline["r2"] - current_r2
         if r2_drop > R2_DROP_THRESHOLD:
-            reasons.append(
-                f"R2 dropped {r2_drop:.3f} vs baseline "
-                f"({current_r2:.3f} vs {baseline['r2']:.3f})"
-            )
+            reasons.append(f"R2 dropped {r2_drop:.3f} vs baseline " f"({current_r2:.3f} vs {baseline['r2']:.3f})")
 
     return {
         "should_retrain": bool(reasons),

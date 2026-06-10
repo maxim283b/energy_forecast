@@ -19,6 +19,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
 COPY src/ ./src/
 COPY data/ ./data/
 COPY models/ ./models/
+RUN test -f models/model.json
 
 # Открываем порт для FastAPI
 EXPOSE 8000

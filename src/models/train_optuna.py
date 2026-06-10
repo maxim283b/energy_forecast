@@ -20,9 +20,7 @@ sys.path.append(str(BASE_DIR))
 try:
     from src.visualization.visualize import run_visualizations
 except ImportError:
-    print(
-        "Warning: Не удалось импортировать run_visualizations. Проверь структуру папок."
-    )
+    print("Warning: Не удалось импортировать run_visualizations. Проверь структуру папок.")
 
 # Конфигурация
 DEFAULT_DATA_PATH = BASE_DIR / "data/processed/energy_ready.csv"
@@ -131,9 +129,7 @@ def main():
     with mlflow.start_run(run_name="XGB_Final_Log_Corrected"):
         best_model = xgb.XGBRegressor(**study.best_params, early_stopping_rounds=100)
 
-        best_model.fit(
-            X_train, y_train_log, eval_set=[(X_test, y_test_log)], verbose=100
-        )
+        best_model.fit(X_train, y_train_log, eval_set=[(X_test, y_test_log)], verbose=100)
 
         # 5. Обратная трансформация (ГЛАВНОЕ ДЛЯ ГРАФИКОВ)
         preds_log = best_model.predict(X_test)

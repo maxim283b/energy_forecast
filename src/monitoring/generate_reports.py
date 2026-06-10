@@ -18,9 +18,7 @@ try:
     )
     from evidently.report import Report
 except ImportError as exc:  # pragma: no cover
-    raise ImportError(
-        "Evidently is not installed. Install dependencies first."
-    ) from exc
+    raise ImportError("Evidently is not installed. Install dependencies first.") from exc
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(BASE_DIR))

@@ -27,13 +27,14 @@ jobs:
           pip install flake8 pytest black
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Lint with flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Run isort
+        run: isort . --settings-path .isort.cfg --check-only
 
       - name: Format check with black
-        run: black --check .
+        run: black . --config .black --check
+
+      - name: Run flake8
+        run: flake8 --config .flake8 .
 
       - name: Run tests
         run: pytest tests/
@@ -53,6 +54,38 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Restore model from DVC
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install dvc dvc-gdrive
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          credentials = {
+              "client_id": os.environ["GDRIVE_CLIENT_ID"],
+              "client_secret": os.environ["GDRIVE_CLIENT_SECRET"],
+              "refresh_token": os.environ["GDRIVE_REFRESH_TOKEN"],
+              "type": "authorized_user",
+          }
+          path = Path(".dvc/tmp/gdrive-user-credentials.json")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(credentials), encoding="utf-8")
+          PY
+          dvc remote modify --local storage gdrive_user_credentials_file .dvc/tmp/gdrive-user-credentials.json
+          dvc pull models/model.json
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

@@ -35,3 +35,8 @@ pydantic-settings
 # Testing
 pytest
 pytest-asyncio  # пригодится, если начнешь использовать async в FastAPI
+
+# Linting & Formatting
+black
+flake8
+isort

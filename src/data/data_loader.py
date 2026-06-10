@@ -28,9 +28,7 @@ class EnergyDataGoldMiner:
 
         # 1. Цены целевой страны (Target)
         try:
-            prices = self.client.query_day_ahead_prices(
-                country_code, start=start, end=end
-            )
+            prices = self.client.query_day_ahead_prices(country_code, start=start, end=end)
             df = prices.reset_index()
             df.columns = ["timestamp", "price"]
             df = df.drop_duplicates(subset=["timestamp"])
@@ -43,9 +41,7 @@ class EnergyDataGoldMiner:
         for neighbor in neighbors:
             try:
                 print(f"  Fetching neighbor prices: {neighbor}...")
-                n_prices = self.client.query_day_ahead_prices(
-                    neighbor, start=start, end=end
-                )
+                n_prices = self.client.query_day_ahead_prices(neighbor, start=start, end=end)
                 n_df = n_prices.reset_index()
                 n_df.columns = ["timestamp", f'price_{neighbor.split("_")[0].lower()}']
                 n_df = n_df.drop_duplicates(subset=["timestamp"])
@@ -69,9 +65,7 @@ class EnergyDataGoldMiner:
 
         # 4. Прогноз генерации (Solar/Wind)
         try:
-            gen_f = self.client.query_wind_and_solar_forecast(
-                country_code, start=start, end=end
-            )
+            gen_f = self.client.query_wind_and_solar_forecast(country_code, start=start, end=end)
             gen_df = gen_f.reset_index()
             rename_dict = {"index": "timestamp"}
             for col in gen_df.columns:
@@ -85,9 +79,7 @@ class EnergyDataGoldMiner:
             if len(wind_cols) > 1:
                 gen_df["wind_forecast"] = gen_df[wind_cols].sum(axis=1)
 
-            cols = ["timestamp"] + [
-                c for c in ["solar_forecast", "wind_forecast"] if c in gen_df.columns
-            ]
+            cols = ["timestamp"] + [c for c in ["solar_forecast", "wind_forecast"] if c in gen_df.columns]
             df = df.merge(
                 gen_df[cols].drop_duplicates(subset=["timestamp"]),
                 on="timestamp",
@@ -123,9 +115,7 @@ class EnergyDataGoldMiner:
         try:
             response = requests.get(url, params=params, timeout=30)
             w_df = pd.DataFrame(response.json()["hourly"])
-            w_df["timestamp"] = pd.to_datetime(w_df["time"], utc=True).dt.tz_convert(
-                "Europe/Brussels"
-            )
+            w_df["timestamp"] = pd.to_datetime(w_df["time"], utc=True).dt.tz_convert("Europe/Brussels")
             return w_df.drop("time", axis=1)
         except Exception as e:
             print(f"  Weather error: {e}")

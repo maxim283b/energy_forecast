@@ -26,9 +26,7 @@ def main(input_filepath, output_filepath):
 
         # 2. Обработка времени
         # Важно: преобразуем в Datetime и приводим к локальному времени Брюсселя
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True).dt.tz_convert(
-            "Europe/Brussels"
-        )
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True).dt.tz_convert("Europe/Brussels")
 
         # Сортировка по времени критична для создания лагов (shift) в будущем
         df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
@@ -38,9 +36,7 @@ def main(input_filepath, output_filepath):
         # Линейная интерполяция здесь наиболее стабильна.
         initial_nans = df.isna().sum().sum()
         if initial_nans > 0:
-            logger.info(
-                f"Обнаружено {initial_nans} пропусков. Выполняется интерполяция..."
-            )
+            logger.info(f"Обнаружено {initial_nans} пропусков. Выполняется интерполяция...")
             # Интерполируем все колонки (цены соседей, погоду, нагрузку)
             df = df.interpolate(method="linear", limit_direction="both")
 
@@ -48,9 +44,7 @@ def main(input_filepath, output_filepath):
         # В Бельгии цены могут быть отрицательными (избыток генерации).
         # Ограничиваем снизу на -50, чтобы модель не ловила шум глубоких просадок.
         lower_bound = -50
-        upper_bound = df["price"].quantile(
-            0.995
-        )  # 0.5% самых экстремальных цен обрезаем
+        upper_bound = df["price"].quantile(0.995)  # 0.5% самых экстремальных цен обрезаем
 
         df["price"] = df["price"].clip(lower=lower_bound, upper=upper_bound)
 

@@ -12,17 +12,13 @@ OUTPUT_PATH = BASE_DIR / "data/processed/energy_ready.csv"
 
 
 def add_time_features(df):
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True).dt.tz_convert(
-        "Europe/Brussels"
-    )
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True).dt.tz_convert("Europe/Brussels")
     df["hour"] = df["timestamp"].dt.hour
     df["day_of_week"] = df["timestamp"].dt.dayofweek
     df["month"] = df["timestamp"].dt.month
 
     be_holidays = holidays.BE()
-    df["is_holiday"] = df["timestamp"].dt.date.apply(
-        lambda x: 1 if x in be_holidays else 0
-    )
+    df["is_holiday"] = df["timestamp"].dt.date.apply(lambda x: 1 if x in be_holidays else 0)
     df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
 
     df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
@@ -38,9 +34,7 @@ def add_market_physics_features(df):
             df[col] = df[col].ffill().fillna(0)
 
     # 2. Net Load (Критический признак для R2)
-    df["net_load_forecast"] = (
-        df["load_forecast"] - df["solar_forecast"] - df["wind_forecast"]
-    )
+    df["net_load_forecast"] = df["load_forecast"] - df["solar_forecast"] - df["wind_forecast"]
 
     # 3. Энергетический микс
     df["renewable_total"] = df["solar_forecast"] + df["wind_forecast"]
@@ -138,9 +132,7 @@ def main():
         "price_std_24h",
     ]
 
-    final_df = (
-        df[[c for c in features if c in df.columns]].dropna().reset_index(drop=True)
-    )
+    final_df = df[[c for c in features if c in df.columns]].dropna().reset_index(drop=True)
 
     print(f"Total features: {len(final_df.columns) - 2}")
     print(f"Final shape: {final_df.shape}")

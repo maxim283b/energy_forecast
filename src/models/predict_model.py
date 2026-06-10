@@ -53,21 +53,15 @@ def main():
     df = pd.read_csv(DATA_PATH)
 
     # 2. Берем последние 5 строк для примера
-    sample_data = df.tail(
-        5
-    ).copy()  # Используем copy(), чтобы не было SettingWithCopyWarning
+    sample_data = df.tail(5).copy()  # Используем copy(), чтобы не было SettingWithCopyWarning
 
     try:
         # 3. Выполняем прогноз
         results = predict_local(sample_data)
 
         print("\n--- Результаты прогноза (последние 5 часов) ---")
-        output = pd.DataFrame(
-            {"timestamp": sample_data["timestamp"].values, "predicted_price": results}
-        )
-        output["anomaly_flag"] = (output["predicted_price"] < 0) | (
-            output["predicted_price"] > 200
-        )
+        output = pd.DataFrame({"timestamp": sample_data["timestamp"].values, "predicted_price": results})
+        output["anomaly_flag"] = (output["predicted_price"] < 0) | (output["predicted_price"] > 200)
         print(output.to_string(index=False))
 
         output_dir = BASE_DIR / "data/predictions"

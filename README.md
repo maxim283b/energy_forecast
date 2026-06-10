@@ -77,7 +77,14 @@ pip uninstall -y mlflow mlflow-skinny protobuf
 pip install -r requirements.txt
 ```
 
-### 2. Запуск локальной инфраструктуры
+### 2. Восстановление DVC-артефактов
+```bash
+dvc pull models/model.json
+```
+
+Без `models/model.json` API запустится, но `/predict` вернет `503`.
+
+### 3. Запуск локальной инфраструктуры
 ```bash
 docker compose up -d mlflow_server energy_api streamlit_ui prometheus grafana
 ```
@@ -91,7 +98,7 @@ docker compose up -d mlflow_server energy_api streamlit_ui prometheus grafana
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (`admin` / `admin`)
 
-### 3. Запуск API без Docker
+### 4. Запуск API без Docker
 ```bash
 python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8001
 ```
@@ -106,7 +113,7 @@ curl http://127.0.0.1:8001/health
 curl http://127.0.0.1:8001/metrics
 ```
 
-### 4. Запуск всего пайплайна
+### 5. Запуск всего пайплайна
 ```bash
 dvc repro
 ```
@@ -120,7 +127,7 @@ dvc repro
 - `predict`
 - `monitor`
 
-### 5. Переобучение через API
+### 6. Переобучение через API
 ```bash
 curl -X POST http://127.0.0.1:8001/v1/retrain \
   -H "Content-Type: application/json" \
@@ -150,7 +157,7 @@ curl http://127.0.0.1:8001/v1/retrain/<job_id>
 curl -X POST http://127.0.0.1:8001/v1/model/reload
 ```
 
-### 6. Локальный инференс
+### 7. Локальный инференс
 ```bash
 python src/models/predict_model.py
 ```
@@ -159,7 +166,7 @@ python src/models/predict_model.py
 
 - `data/predictions/latest_forecast.csv`
 
-### 7. Drift monitoring и UI
+### 8. Drift monitoring и UI
 ```bash
 python src/monitoring/generate_reports.py
 streamlit run src/ui/app.py
@@ -216,6 +223,8 @@ MLflow experiment `Energy_Forecast_Final`.
 - `GDRIVE_CLIENT_SECRET`
 - `GDRIVE_REFRESH_TOKEN`
 
+CI восстанавливает `models/model.json` через `dvc pull` перед сборкой Docker-образа.
+
 ## Эндпоинты
 - `GET /health`
 - `GET /metrics`
@@ -226,6 +235,9 @@ MLflow experiment `Energy_Forecast_Final`.
 
 ## Проверка качества
 ```bash
+isort . --settings-path .isort.cfg --check-only
+black . --config .black --check
+flake8 --config .flake8 .
 python3 -m pytest tests -q
 python3 -m compileall src tests test_infra.py test_environment.py
 ```
