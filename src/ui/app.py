@@ -45,10 +45,15 @@ def render_drift_notifications() -> None:
         return
 
     checked_at = status.get("checked_at", "n/a")
-    if status.get("should_retrain"):
-        st.error(f"Drift alert. Retrain is recommended. Checked at: {checked_at}")
+    alert_level = status.get("alert_level", "critical" if status.get("should_retrain") else "none")
+    if alert_level == "critical":
+        st.error(f"Quality degradation detected. Retrain is recommended. Checked at: {checked_at}")
         for reason in status.get("reasons", []):
             st.warning(reason)
+    elif alert_level == "warning":
+        st.warning(f"Data drift detected, but quality is still stable. Checked at: {checked_at}")
+        for reason in status.get("reasons", []):
+            st.write(f"- {reason}")
     else:
         st.success(f"No active drift alert. Checked at: {checked_at}")
 
@@ -89,9 +94,14 @@ def render_trigger_status() -> None:
         st.info("Trigger status not available yet. Generate drift reports first.")
         return
 
-    if status.get("should_retrain"):
+    alert_level = status.get("alert_level", "critical" if status.get("should_retrain") else "none")
+    if alert_level == "critical":
         st.error("Retrain recommended")
-        for reason in status.get("reasons", []):
+        for reason in status.get("quality_reasons", status.get("reasons", [])):
+            st.write(f"- {reason}")
+    elif alert_level == "warning":
+        st.warning("Data drift detected, retrain is not required yet")
+        for reason in status.get("drift_reasons", status.get("reasons", [])):
             st.write(f"- {reason}")
     else:
         st.success("Retrain not required")

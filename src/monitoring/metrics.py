@@ -137,34 +137,73 @@ def evaluate_retrain_trigger(
     psi_scores = compute_psi_by_feature(reference, current, KEY_FEATURES)
     max_psi = max(psi_scores.values()) if psi_scores else 0.0
     max_psi_feature = max(psi_scores, key=psi_scores.get) if psi_scores else None
+    feature_psi_scores = {feature: score for feature, score in psi_scores.items() if feature != "target"}
+    drifted_features = sorted(
+        [feature for feature, score in feature_psi_scores.items() if score > PSI_THRESHOLD],
+        key=lambda feature: feature_psi_scores[feature],
+        reverse=True,
+    )
+    target_psi = psi_scores.get("target")
 
     baseline = load_baseline_metrics()
     current_metrics = current_metrics or {}
     current_mae = current_metrics.get("mae")
     current_r2 = current_metrics.get("r2")
 
-    reasons: list[str] = []
-    if max_psi > PSI_THRESHOLD:
-        reasons.append(f"PSI {max_psi:.3f} on '{max_psi_feature}' > {PSI_THRESHOLD}")
+    drift_reasons: list[str] = []
+    quality_reasons: list[str] = []
+    if drifted_features:
+        top_feature = drifted_features[0]
+        drift_reasons.append(f"PSI {feature_psi_scores[top_feature]:.3f} on '{top_feature}' > {PSI_THRESHOLD}")
+        if len(drifted_features) > 1:
+            drift_reasons.append(f"Drift also detected in {len(drifted_features) - 1} more feature(s)")
+    if target_psi is not None and target_psi > PSI_THRESHOLD:
+        drift_reasons.append(f"Target PSI {target_psi:.3f} > {PSI_THRESHOLD}")
 
     if current_mae is not None and baseline.get("mae"):
         mae_increase = (current_mae - baseline["mae"]) / baseline["mae"]
         if mae_increase > MAE_INCREASE_RATIO:
-            reasons.append(
+            quality_reasons.append(
                 f"MAE increased {mae_increase:.1%} vs baseline " f"({current_mae:.2f} vs {baseline['mae']:.2f})"
             )
+    else:
+        mae_increase = None
 
     if current_r2 is not None and baseline.get("r2") is not None:
         r2_drop = baseline["r2"] - current_r2
         if r2_drop > R2_DROP_THRESHOLD:
-            reasons.append(f"R2 dropped {r2_drop:.3f} vs baseline " f"({current_r2:.3f} vs {baseline['r2']:.3f})")
+            quality_reasons.append(
+                f"R2 dropped {r2_drop:.3f} vs baseline " f"({current_r2:.3f} vs {baseline['r2']:.3f})"
+            )
+    else:
+        r2_drop = None
+
+    quality_degraded = bool(quality_reasons)
+    drift_detected = bool(drift_reasons)
+    if quality_degraded:
+        alert_level = "critical"
+        reasons = quality_reasons + drift_reasons
+    elif drift_detected:
+        alert_level = "warning"
+        reasons = drift_reasons
+    else:
+        alert_level = "none"
+        reasons = []
 
     return {
-        "should_retrain": bool(reasons),
+        "should_retrain": quality_degraded,
+        "alert_level": alert_level,
         "reasons": reasons,
+        "drift_reasons": drift_reasons,
+        "quality_reasons": quality_reasons,
+        "drift_detected": drift_detected,
+        "quality_degraded": quality_degraded,
+        "drifted_features": drifted_features,
         "psi_scores": psi_scores,
         "max_psi": max_psi,
         "max_psi_feature": max_psi_feature,
         "baseline_metrics": baseline,
         "current_metrics": current_metrics,
+        "mae_increase_ratio": mae_increase,
+        "r2_drop": r2_drop,
     }
