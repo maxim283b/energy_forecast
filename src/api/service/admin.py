@@ -110,6 +110,35 @@ def _refresh_artifacts() -> tuple[bool, bool]:
     return predictions_generated, reports_generated
 
 
+def _merge_into_history(batch_path: Path) -> tuple[Path, int, int]:
+    batch_df = pd.read_csv(batch_path)
+    if "timestamp" not in batch_df.columns:
+        raise AdminServiceError(400, "Dataset must contain timestamp column")
+
+    batch_df["timestamp"] = pd.to_datetime(batch_df["timestamp"], utc=True)
+    batch_df = batch_df.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last")
+
+    history_path = settings.RAW_HISTORY_PATH
+    if history_path.exists():
+        history_df = pd.read_csv(history_path)
+        if "timestamp" not in history_df.columns:
+            raise AdminServiceError(500, "Historical dataset is missing timestamp column")
+        history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], utc=True)
+        history_df = history_df.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last")
+        existing_timestamps = set(history_df["timestamp"])
+        appended_rows = int((~batch_df["timestamp"].isin(existing_timestamps)).sum())
+        merged_df = pd.concat([history_df, batch_df], ignore_index=True)
+    else:
+        appended_rows = int(len(batch_df))
+        merged_df = batch_df.copy()
+
+    merged_df = merged_df.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last")
+    total_rows = int(len(merged_df))
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    merged_df.to_csv(history_path, index=False)
+    return history_path, appended_rows, total_rows
+
+
 def _process_uploaded_dataset(job: dict, filename: str, file_bytes: bytes) -> None:
     started_at = perf_counter()
     settings.RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -124,14 +153,17 @@ def _process_uploaded_dataset(job: dict, filename: str, file_bytes: bytes) -> No
         _update_job(job, 30, "validating", "Validating uploaded dataset schema.")
         _validate_uploaded_csv(raw_path)
 
-        _update_job(job, 45, "cleaning", "Cleaning raw dataset.")
-        interim_path = clean_dataset(raw_path, settings.INTERIM_DATA_PATH)
+        _update_job(job, 45, "merging_history", "Merging uploaded data into historical dataset.")
+        history_raw_path, appended_rows, total_history_rows = _merge_into_history(raw_path)
 
-        _update_job(job, 60, "featurizing", "Building feature dataset.")
+        _update_job(job, 60, "cleaning", "Cleaning merged historical dataset.")
+        interim_path = clean_dataset(history_raw_path, settings.INTERIM_DATA_PATH)
+
+        _update_job(job, 75, "featurizing", "Building feature dataset.")
         processed_path = build_feature_dataset(interim_path, settings.PROCESSED_DATA_PATH)
         processed_df = pd.read_csv(processed_path)
 
-        _update_job(job, 80, "predicting", "Generating latest forecast.")
+        _update_job(job, 90, "predicting", "Generating latest forecast.")
         predictions_generated, reports_generated = _refresh_artifacts()
 
         DATASET_UPLOAD_REQUESTS.labels(result="success").inc()
@@ -144,9 +176,12 @@ def _process_uploaded_dataset(job: dict, filename: str, file_bytes: bytes) -> No
             "status": "uploaded",
             "filename": filename,
             "raw_path": str(raw_path.relative_to(settings.BASE_DIR)),
+            "history_raw_path": str(history_raw_path.relative_to(settings.BASE_DIR)),
             "interim_path": str(Path(interim_path).relative_to(settings.BASE_DIR)),
             "processed_path": str(Path(processed_path).relative_to(settings.BASE_DIR)),
             "processed_rows": int(len(processed_df)),
+            "appended_rows": appended_rows,
+            "total_history_rows": total_history_rows,
             "ready_for_retrain": True,
             "predictions_generated": predictions_generated,
             "reports_generated": reports_generated,
@@ -186,12 +221,16 @@ def _process_entsoe_fetch(job: dict, request: EntsoeFetchRequest) -> None:
 
         _update_job(job, 45, "validating", "Validating fetched dataset.")
         _validate_uploaded_csv(raw_path)
-        _update_job(job, 60, "cleaning", "Cleaning fetched dataset.")
-        interim_path = clean_dataset(raw_path, settings.INTERIM_DATA_PATH)
-        _update_job(job, 75, "featurizing", "Building features from fetched dataset.")
+
+        _update_job(job, 55, "merging_history", "Merging fetched data into historical dataset.")
+        history_raw_path, appended_rows, total_history_rows = _merge_into_history(raw_path)
+
+        _update_job(job, 70, "cleaning", "Cleaning merged historical dataset.")
+        interim_path = clean_dataset(history_raw_path, settings.INTERIM_DATA_PATH)
+        _update_job(job, 82, "featurizing", "Building features from merged dataset.")
         processed_path = build_feature_dataset(interim_path, settings.PROCESSED_DATA_PATH)
         processed_df = pd.read_csv(processed_path)
-        _update_job(job, 90, "predicting", "Generating predictions and drift reports.")
+        _update_job(job, 92, "predicting", "Generating predictions and drift reports.")
         predictions_generated, reports_generated = _refresh_artifacts()
 
         DATASET_UPLOAD_REQUESTS.labels(result="success").inc()
@@ -206,9 +245,12 @@ def _process_entsoe_fetch(job: dict, request: EntsoeFetchRequest) -> None:
             "start_year": request.start_year,
             "end_year": request.end_year,
             "raw_path": str(raw_path.relative_to(settings.BASE_DIR)),
+            "history_raw_path": str(history_raw_path.relative_to(settings.BASE_DIR)),
             "interim_path": str(Path(interim_path).relative_to(settings.BASE_DIR)),
             "processed_path": str(Path(processed_path).relative_to(settings.BASE_DIR)),
             "processed_rows": int(len(processed_df)),
+            "appended_rows": appended_rows,
+            "total_history_rows": total_history_rows,
             "ready_for_retrain": True,
             "predictions_generated": predictions_generated,
             "reports_generated": reports_generated,

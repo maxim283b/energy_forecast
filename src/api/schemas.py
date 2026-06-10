@@ -69,9 +69,12 @@ class DatasetUploadResponse(BaseModel):
     status: str
     filename: str
     raw_path: str
+    history_raw_path: str
     interim_path: str
     processed_path: str
     processed_rows: int
+    appended_rows: int
+    total_history_rows: int
     ready_for_retrain: bool
 
 
@@ -89,9 +92,12 @@ class EntsoeFetchResponse(BaseModel):
     start_year: int
     end_year: int
     raw_path: str
+    history_raw_path: str
     interim_path: str
     processed_path: str
     processed_rows: int
+    appended_rows: int
+    total_history_rows: int
     ready_for_retrain: bool
     predictions_generated: bool
     reports_generated: bool
