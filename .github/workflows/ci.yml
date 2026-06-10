@@ -63,9 +63,7 @@ jobs:
 
       - name: Restore model from DVC
         env:
-          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: |
           python -m pip install --upgrade pip
           pip install dvc dvc-gdrive
@@ -73,29 +71,12 @@ jobs:
           import os
           from pathlib import Path
 
-          from oauth2client.client import OAuth2Credentials
-
-          credentials = OAuth2Credentials(
-              access_token=None,
-              client_id=os.environ["GDRIVE_CLIENT_ID"],
-              client_secret=os.environ["GDRIVE_CLIENT_SECRET"],
-              refresh_token=os.environ["GDRIVE_REFRESH_TOKEN"],
-              token_expiry=None,
-              token_uri="https://oauth2.googleapis.com/token",
-              user_agent=None,
-              revoke_uri="https://oauth2.googleapis.com/revoke",
-              scopes=[
-                  "https://www.googleapis.com/auth/drive",
-                  "https://www.googleapis.com/auth/drive.appdata",
-              ],
-          )
-          path = Path(".dvc/tmp/gdrive-user-credentials.json")
+          path = Path(".dvc/tmp/gdrive-service-account.json")
           path.parent.mkdir(parents=True, exist_ok=True)
-          path.write_text(credentials.to_json(), encoding="utf-8")
+          path.write_text(os.environ["GDRIVE_SERVICE_ACCOUNT_JSON"], encoding="utf-8")
           PY
-          dvc remote modify --local storage gdrive_client_id "$GDRIVE_CLIENT_ID"
-          dvc remote modify --local storage gdrive_client_secret "$GDRIVE_CLIENT_SECRET"
-          dvc remote modify --local storage gdrive_user_credentials_file .dvc/tmp/gdrive-user-credentials.json
+          dvc remote modify --local storage gdrive_use_service_account true
+          dvc remote modify --local storage gdrive_service_account_json_file_path .dvc/tmp/gdrive-service-account.json
           dvc pull models/model.json
 
       - name: Set up Docker Buildx
