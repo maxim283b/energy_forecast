@@ -7,6 +7,7 @@ import pandas as pd
 try:
     import holidays
 except ImportError:  # pragma: no cover
+
     class _FallbackHolidays:
         @staticmethod
         def BE():
