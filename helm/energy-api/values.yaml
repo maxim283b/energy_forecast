@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/maxim283b/energy_forecast/energy-api
   pullPolicy: IfNotPresent
-  tag: "7eabe83960cd14eca40fa51e40e13fdf9eebc081"
+  tag: "8bed5ab3589d6747d86e4e90c88ff9a0f9a56e03"
 
 imagePullSecrets: []
 
