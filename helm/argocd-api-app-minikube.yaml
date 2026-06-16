@@ -11,7 +11,7 @@ spec:
     path: helm/energy-api
     helm:
       valueFiles:
-        - values-minikube.yaml
+        - values.yaml
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: energy-forecast

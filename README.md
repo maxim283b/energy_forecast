@@ -85,6 +85,16 @@ dvc pull models/model.json
 Без `models/model.json` API запустится, но `/predict` вернет `503`.
 
 ### 3. Запуск всего проекта в Minikube
+Production-like режим через GHCR + ArgoCD:
+```bash
+minikube start
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl rollout status deployment/argocd-server -n argocd
+kubectl apply -f helm/argocd-api-app-minikube.yaml
+```
+
+Локальный dev-режим без registry:
 ```bash
 minikube start
 eval $(minikube docker-env)
@@ -293,23 +303,31 @@ Production-like GitOps flow:
 - Pull Request в `main` запускает lint, tests, Docker build без push и Helm
   validation.
 - Merge/push в `main` публикует Docker image в GHCR и обновляет Helm image tag.
-- ArgoCD читает `main` и синхронизирует Helm chart в Kubernetes.
+- ArgoCD читает `main`, берёт `helm/energy-api/values.yaml` и синхронизирует
+  Helm chart в Kubernetes.
 
 Прямой деплой Helm:
 ```bash
 helm upgrade --install energy-api helm/energy-api \
-  -f helm/energy-api/values-minikube.yaml \
+  -f helm/energy-api/values.yaml \
   --namespace energy-forecast
 ```
 
 GitOps через ArgoCD в Minikube:
 ```bash
-eval $(minikube docker-env)
-docker build -t energy-api:local .
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl rollout status deployment/argocd-server -n argocd
 kubectl apply -f helm/argocd-api-app-minikube.yaml
+```
+
+Локальный dev-режим с образом внутри Minikube:
+```bash
+eval $(minikube docker-env)
+docker build -t energy-api:local .
+helm upgrade --install energy-api helm/energy-api \
+  -f helm/energy-api/values-minikube.yaml \
+  --namespace energy-forecast
 ```
 
 Открыть ArgoCD:
