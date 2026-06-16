@@ -195,10 +195,7 @@ def render_manual_prediction() -> None:
         response.raise_for_status()
         prediction = response.json()
         _append_prediction(timestamp, prediction)
-        st.success(
-            f"Predicted price: {prediction['predicted_price']:.3f}; "
-            f"anomaly: {prediction['anomaly_flag']}"
-        )
+        st.success(f"Predicted price: {prediction['predicted_price']:.3f}; " f"anomaly: {prediction['anomaly_flag']}")
     except requests.RequestException as exc:
         st.error(f"Prediction API error: {exc}")
         st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
