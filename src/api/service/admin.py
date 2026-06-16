@@ -274,12 +274,14 @@ def _process_artifacts(job: dict) -> None:
             "status": "generated",
             "predictions_generated": predictions_generated,
             "reports_generated": reports_generated,
-            "predictions_path": str(settings.PREDICTIONS_PATH.relative_to(settings.BASE_DIR))
-            if settings.PREDICTIONS_PATH.exists()
-            else None,
-            "reports_dir": str(settings.REPORTS_DIR.relative_to(settings.BASE_DIR))
-            if settings.REPORTS_DIR.exists()
-            else None,
+            "predictions_path": (
+                str(settings.PREDICTIONS_PATH.relative_to(settings.BASE_DIR))
+                if settings.PREDICTIONS_PATH.exists()
+                else None
+            ),
+            "reports_dir": (
+                str(settings.REPORTS_DIR.relative_to(settings.BASE_DIR)) if settings.REPORTS_DIR.exists() else None
+            ),
         }
         _complete_job(job, "succeeded", result, "Predictions and reports generated successfully.")
     except Exception as exc:
