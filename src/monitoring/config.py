@@ -6,6 +6,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_EXPERIMENT = os.getenv("MLFLOW_EXPERIMENT", "Energy_Forecast_Final")
 
+PREDICT_API_URL = os.getenv("PREDICT_API_URL", "http://127.0.0.1:8001/predict")
 RETRAIN_API_URL = os.getenv("RETRAIN_API_URL", "http://127.0.0.1:8001/v1/retrain")
 RETRAIN_STATUS_API_BASE = os.getenv("RETRAIN_STATUS_API_BASE", "http://127.0.0.1:8001/v1/retrain")
 ADMIN_DATASET_UPLOAD_URL = os.getenv(

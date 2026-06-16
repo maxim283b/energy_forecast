@@ -21,8 +21,10 @@ from src.monitoring.config import (  # noqa: E402
     ADMIN_ENTSOE_FETCH_URL,
     ADMIN_GENERATE_ARTIFACTS_URL,
     ADMIN_JOB_STATUS_API_BASE,
+    DATA_PATH,
     MLFLOW_EXPERIMENT,
     MLFLOW_TRACKING_URI,
+    PREDICT_API_URL,
     PREDICTIONS_PATH,
     REPORTS_DIR,
     RETRAIN_API_URL,
@@ -30,6 +32,35 @@ from src.monitoring.config import (  # noqa: E402
     RETRAIN_STATUS_API_BASE,
     TRIGGER_STATUS_PATH,
 )
+
+PREDICTION_FEATURES = [
+    "hour_sin",
+    "hour_cos",
+    "day_of_week",
+    "is_holiday",
+    "is_weekend",
+    "load_forecast",
+    "net_load_forecast",
+    "solar_forecast",
+    "wind_forecast",
+    "renewable_total",
+    "non_renewable_needed",
+    "load_trend_24h",
+    "price_fr_lag_24",
+    "price_de_lag_24",
+    "price_nl_lag_24",
+    "spread_be_fr_lag_24",
+    "spread_be_de_lag_24",
+    "spread_be_nl_lag_24",
+    "temperature_2m",
+    "wind_speed_10m",
+    "direct_radiation",
+    "price_lag_24",
+    "price_lag_48",
+    "price_lag_168",
+    "price_mean_24h",
+    "price_std_24h",
+]
 
 
 def load_trigger_status() -> dict | None:
@@ -85,6 +116,92 @@ def render_predictions() -> None:
         chart_df["timestamp"] = pd.to_datetime(chart_df["timestamp"], errors="coerce")
         chart_df = chart_df.dropna(subset=["timestamp"]).set_index("timestamp")
         st.line_chart(chart_df["predicted_price"])
+
+
+def _load_latest_feature_row() -> pd.Series | None:
+    if not DATA_PATH.exists():
+        return None
+
+    data = pd.read_csv(DATA_PATH)
+    if data.empty:
+        return None
+    return data.sort_values("timestamp").iloc[-1]
+
+
+def _append_prediction(timestamp: str, prediction: dict) -> None:
+    PREDICTIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    new_row = pd.DataFrame(
+        [
+            {
+                "timestamp": timestamp,
+                "predicted_price": prediction["predicted_price"],
+                "anomaly_flag": prediction["anomaly_flag"],
+            }
+        ]
+    )
+
+    if PREDICTIONS_PATH.exists():
+        existing = pd.read_csv(PREDICTIONS_PATH)
+        output = pd.concat([existing, new_row], ignore_index=True)
+    else:
+        output = new_row
+
+    output.to_csv(PREDICTIONS_PATH, index=False)
+
+
+def render_manual_prediction() -> None:
+    st.subheader("Manual Prediction")
+    st.caption(f"POST {PREDICT_API_URL}")
+
+    latest_row = _load_latest_feature_row()
+    if latest_row is None:
+        st.warning("Processed dataset is missing or empty.")
+        return
+
+    default_timestamp = str(latest_row.get("timestamp", pd.Timestamp.utcnow().isoformat()))
+    with st.form("manual_prediction_form"):
+        timestamp = st.text_input("Timestamp", value=default_timestamp)
+
+        payload = {}
+        with st.expander("Features"):
+            for feature in PREDICTION_FEATURES:
+                default_value = latest_row.get(feature, 0)
+                if feature in {"day_of_week", "is_holiday", "is_weekend"}:
+                    payload[feature] = int(
+                        st.number_input(
+                            feature,
+                            value=int(default_value),
+                            step=1,
+                            key=f"predict_{feature}",
+                        )
+                    )
+                else:
+                    payload[feature] = float(
+                        st.number_input(
+                            feature,
+                            value=float(default_value),
+                            format="%.6f",
+                            key=f"predict_{feature}",
+                        )
+                    )
+
+        submitted = st.form_submit_button("Predict")
+
+    if not submitted:
+        return
+
+    try:
+        response = requests.post(PREDICT_API_URL, json=payload, timeout=30)
+        response.raise_for_status()
+        prediction = response.json()
+        _append_prediction(timestamp, prediction)
+        st.success(
+            f"Predicted price: {prediction['predicted_price']:.3f}; "
+            f"anomaly: {prediction['anomaly_flag']}"
+        )
+    except requests.RequestException as exc:
+        st.error(f"Prediction API error: {exc}")
+        st.info("Run the API in another terminal: " "`uvicorn src.api.main:app --host 127.0.0.1 --port 8001`")
 
 
 def render_trigger_status() -> None:
@@ -319,6 +436,7 @@ def main() -> None:
     )
 
     with tab_predictions:
+        render_manual_prediction()
         render_predictions()
 
     with tab_drift:

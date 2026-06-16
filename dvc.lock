@@ -102,8 +102,8 @@ stages:
       size: 3419019
     - path: src/monitoring/config.py
       hash: md5
-      md5: 84f33be6dafd01ee8e11c538fa763e1f
-      size: 1758
+      md5: 0ef0c86a82118160fb2ddded6a3b8608
+      size: 1838
     - path: src/monitoring/generate_reports.py
       hash: md5
       md5: f09e1bc4e016e07360205a6304560863

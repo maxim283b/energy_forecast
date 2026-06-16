@@ -53,6 +53,8 @@ spec:
               {{- else }}
               value: {{ default "http://localhost:5000" .Values.env.MLFLOW_TRACKING_URI | quote }}
               {{- end }}
+            - name: PREDICT_API_URL
+              value: {{ printf "http://%s:%v/predict" (include "energy-api.fullname" .) .Values.service.port | quote }}
             - name: RETRAIN_API_URL
               value: {{ printf "http://%s:%v/v1/retrain" (include "energy-api.fullname" .) .Values.service.port | quote }}
             - name: RETRAIN_STATUS_API_BASE
