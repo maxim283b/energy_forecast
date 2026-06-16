@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import src.api.main as main_module
 from src.api import settings
+from src.api.service import admin as admin_service
 from src.api.service import model as model_service
 from src.api.service import retrain as retrain_service
 
@@ -187,12 +188,27 @@ def test_retrain_endpoint_requires_force_for_existing_model(monkeypatch, tmp_pat
 
 def test_admin_dataset_upload_processes_pipeline(monkeypatch, tmp_path):
     raw_dir = tmp_path / "data" / "raw"
+    raw_history_path = raw_dir / "big_energy_dataset_v2.csv"
     interim_path = tmp_path / "data" / "interim" / "energy_cleaned.csv"
     processed_path = tmp_path / "data" / "processed" / "energy_ready.csv"
     monkeypatch.setattr(settings, "BASE_DIR", tmp_path)
     monkeypatch.setattr(settings, "RAW_DATA_DIR", raw_dir)
+    monkeypatch.setattr(settings, "RAW_HISTORY_PATH", raw_history_path)
     monkeypatch.setattr(settings, "INTERIM_DATA_PATH", interim_path)
     monkeypatch.setattr(settings, "PROCESSED_DATA_PATH", processed_path)
+
+    class ImmediateThread:
+        def __init__(self, target, args=(), kwargs=None, daemon=None):
+            self.target = target
+            self.args = args
+            self.kwargs = kwargs or {}
+
+        def start(self):
+            self.target(*self.args, **self.kwargs)
+
+    monkeypatch.setattr(admin_service.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(admin_service, "_refresh_artifacts", lambda: (True, True))
+    admin_service.ADMIN_JOBS.clear()
 
     rows = 220
     df = pd.DataFrame(
@@ -218,9 +234,18 @@ def test_admin_dataset_upload_processes_pipeline(monkeypatch, tmp_path):
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["status"] == "uploaded"
-    assert payload["ready_for_retrain"] is True
-    assert payload["processed_rows"] > 0
+    assert payload["status"] == "started"
+    assert payload["job_type"] == "dataset_upload"
+    job_id = payload["job_id"]
+
+    status_response = client.get(f"/v1/admin/jobs/{job_id}")
+    assert status_response.status_code == 200
+    job_payload = status_response.json()
+    assert job_payload["status"] == "succeeded"
+    assert job_payload["result"]["status"] == "uploaded"
+    assert job_payload["result"]["ready_for_retrain"] is True
+    assert job_payload["result"]["processed_rows"] > 0
     assert raw_dir.exists()
+    assert raw_history_path.exists()
     assert interim_path.exists()
     assert processed_path.exists()
