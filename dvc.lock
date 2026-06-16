@@ -115,6 +115,6 @@ stages:
     outs:
     - path: reports/drift
       hash: md5
-      md5: 523174fd596ce061b335940c722ef3c4.dir
-      size: 10295597
+      md5: bd99007a423ac3ba60154638c92ebf9b.dir
+      size: 10295559
       nfiles: 9
